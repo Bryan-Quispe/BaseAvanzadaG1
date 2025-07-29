@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from jose import JWTError, jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 import os
 from dotenv import load_dotenv
@@ -11,15 +11,18 @@ import uuid
 from config.database import get_db
 from schemas.transaccion import ClienteCreate, ClienteUpdate, ClienteResponse, CuentaCreate, CuentaUpdate, CuentaResponse, CajeroCreate, CajeroUpdate, CajeroResponse, DepositoRequest, RetiroRequest, ReciboResponse
 from sqlalchemy.sql import text
+from passlib.context import CryptContext
 
 load_dotenv()
 
 app = FastAPI(title="Banco Pichincha API")
 
-# Configuración de JWT
+# Configuración de JWT y hashing
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token válido por 30 minutos
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Autenticación
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -42,10 +45,53 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
 
+# Modelos
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class SetPasswordRequest(BaseModel):
+    cliente_id: str
+    password: str
+
+# Endpoint de login
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
+    result = db.execute(query, {"cliente_id": form_data.username})
+    cliente = result.fetchone()
+    if not cliente or not pwd_context.verify(form_data.password, cliente.cliente_contrasena):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Cédula o contraseña incorrectos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = jwt.encode(
+        {"sub": cliente.cliente_id, "exp": datetime.utcnow() + access_token_expires},
+        SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Endpoint para establecer contraseña inicial
+@app.post("/clientes/set-password/")
+async def set_initial_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
+    query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
+    result = db.execute(query, {"cliente_id": request.cliente_id})
+    cliente = result.fetchone()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    hashed_password = pwd_context.hash(request.password)
+    query = text("UPDATE CLIENTE SET cliente_contrasena = :password WHERE CLIENTE_ID = :cliente_id")
+    db.execute(query, {"password": hashed_password, "cliente_id": request.cliente_id})
+    db.commit()
+    return {"message": "Contraseña establecida correctamente"}
+
 # CRUD para Cliente
 @app.post("/clientes/", response_model=ClienteResponse)
 async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
-    # Lógica para crear cliente (vacía por ahora)
+    # Lógica para crear cliente (vacía por ahora, añadiría hashed_password si se pasa)
     pass
 
 @app.get("/clientes/", response_model=List[ClienteResponse])

@@ -12,6 +12,7 @@ from config.database import get_db
 from schemas.transaccion import ClienteCreate, ClienteUpdate, ClienteResponse, CuentaCreate, CuentaUpdate, CuentaResponse, CajeroCreate, CajeroUpdate, CajeroResponse, DepositoRequest, RetiroRequest, ReciboResponse
 from sqlalchemy.sql import text
 from passlib.context import CryptContext
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
@@ -268,3 +269,12 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en retiro: {str(e)}")
+    
+ # Agrega esta configuración justo después de: app = FastAPI(...)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # Puedes especificar ["http://localhost:3000"] en lugar de "*"
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

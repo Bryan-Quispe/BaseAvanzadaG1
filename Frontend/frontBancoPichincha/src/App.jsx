@@ -9,7 +9,6 @@ function App() {
   return (
     <>
     <Menu />
-    <h1>Hola mundo</h1>
     </>
   )
 }

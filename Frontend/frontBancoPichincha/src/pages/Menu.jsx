@@ -1,3 +1,6 @@
+import  { useState, useRef } from 'react';
+import { Routes,Route } from 'react-router-dom';
+
 function Menu(token) {
     const botonRef = useRef(null);
     const menuRef = useRef(null);
@@ -44,18 +47,18 @@ function Menu(token) {
         {/* Botón hamburguesa para colapsar en móviles */}
         <div  id="menuNav">
           <ul>
-                  <li >
+                <li >
                     <button  onClick={() => navigate('/')}>
                       <i></i> Inicio
                     </button>
-                  </li>
+                </li>
 
 
                 <li >
                     <button  onClick={() => navigate('/cuentas')}>
                       <i ></i> Cuentas
                     </button>
-                  </li>
+                </li>
 
                 </ul>
               </div>
@@ -68,7 +71,6 @@ function Menu(token) {
             <Route path="/cuentas" element={<div>Reports</div>} />
             </Routes>
           </main>
-          <Menu_logout/>
           
       </div>
       

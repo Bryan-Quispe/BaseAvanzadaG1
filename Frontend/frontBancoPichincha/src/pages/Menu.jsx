@@ -52,39 +52,20 @@ function Menu(token) {
 
 
                 <li >
-                    <button  onClick={() => navigate('/reports')}>
-                      <i ></i> 
+                    <button  onClick={() => navigate('/cuentas')}>
+                      <i ></i> Cuentas
                     </button>
                   </li>
 
-
-                  
-
-                  <li >
-                    <button onClick={() => navigate('/calendar')}>
-                      <i ></i> CALENDARIO
-                    </button>
-                  </li>
-
-                  <li >
-                    <button onClick={() => navigate('/users')}>
-                      <i ></i> USUARIOS
-                    </button>
-                  </li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <main className="container mt-4">
+          <main >
             <Routes>
             <Route path="/" element={<div>Reports</div>} />
-              <Route path="/projects/:projectId" element={<div>Reports</div>} />
-              <Route path="/projects/:projectId/plans/:planId" element={<div>Reports</div>} />
-              <Route path="/profiles" element={<div>Reports</div>} />
-              <Route path="/reports" element={<div>Reports</div>} />
-              <Route path="/calendar" element={<div>Reports</div>} />
-              <Route path="/users" element={<div>Reports</div>} />
+            <Route path="/cuentas" element={<div>Reports</div>} />
             </Routes>
           </main>
           <Menu_logout/>

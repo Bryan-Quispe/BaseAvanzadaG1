@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const registro = () => {
     navigate('/register');
@@ -27,19 +29,17 @@ function Login() {
 
       const data = await response.json();
 
-      localStorage.setItem("token", data.access_token);
       const user = await fetch(`https://baseavanzadag1.onrender.com/clientes/${username}`, {
-        method: "POST",
+        method: "GET",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        body: formData.toString()
+        }
       });
 
-      console.log(user);
 
-      window.location.reload();
+      login(data.access_token);
+
     } catch (error) {
       console.error("Login failed:", error);
     }
@@ -54,7 +54,7 @@ function Login() {
           </h2>
           <div className="mb-4">
             <label className="block text-sm font-semibold text-blue-900 mb-1">
-              Correo Electrónico
+              Username
             </label>
             <input
               type="text"

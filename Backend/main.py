@@ -9,7 +9,15 @@ import os
 from dotenv import load_dotenv
 import uuid
 from config.database import get_db
-from schemas.transaccion import ClienteCreate, ClienteUpdate, ClienteResponse, CuentaCreate, CuentaUpdate, CuentaResponse, CajeroCreate, CajeroUpdate, CajeroResponse, DepositoRequest, RetiroRequest, ReciboResponse
+from schemas.transaccion import (
+    ClienteCreate, ClienteUpdate, ClienteResponse,
+    CuentaCreate, CuentaUpdate, CuentaResponse,
+    CajeroCreate, CajeroUpdate, CajeroResponse,
+    TarjetaCreate, TarjetaUpdate, TarjetaResponse,
+    TarjetaCreditoCreate, TarjetaCreditoUpdate, TarjetaCreditoResponse,
+    TarjetaDebitoCreate, TarjetaDebitoUpdate, TarjetaDebitoResponse,
+    DepositoRequest, RetiroRequest, ReciboResponse
+)
 from sqlalchemy.sql import text
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
@@ -109,13 +117,9 @@ async def change_password(request: ChangePasswordRequest, db: Session = Depends(
 @app.post("/clientes/", response_model=ClienteResponse)
 async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     try:
-        query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
-        result = db.execute(query, {"cliente_id": cliente.cliente_id})
-        if result.fetchone():
-            raise HTTPException(status_code=400, detail="Cliente ya existe")
-        
         # Establecer contraseña inicial "123456"
         hashed_password = pwd_context.hash("123456")
+        cliente_id = str(uuid.uuid4())[:10]  # Generar ID único
         
         query = text("""
             INSERT INTO CLIENTE (
@@ -125,10 +129,10 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
             ) VALUES (
                 :cliente_id, :nombres, :apellidos, :correo, :celular,
                 :direccion, :provincia, :ciudad, :fchnacimiento, :contrasena
-            )
+            ) RETURNING CLIENTE_ID
         """)
         values = {
-            "cliente_id": cliente.cliente_id,
+            "cliente_id": cliente_id,
             "nombres": cliente.cliente_nombres,
             "apellidos": cliente.cliente_apellidos,
             "correo": cliente.cliente_correo,
@@ -139,11 +143,12 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
             "fchnacimiento": cliente.cliente_fchnacimiento,
             "contrasena": hashed_password
         }
-        db.execute(query, values)
+        result = db.execute(query, values)
+        cliente_id = result.fetchone().cliente_id
         db.commit()
         
         query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
-        result = db.execute(query, {"cliente_id": cliente.cliente_id})
+        result = db.execute(query, {"cliente_id": cliente_id})
         cliente_db = result.fetchone()
         columns = result.keys()
         return ClienteResponse(**{col: getattr(cliente_db, col) for col in columns})
@@ -226,23 +231,18 @@ async def crear_cuenta(cuenta: CuentaCreate, db: Session = Depends(get_db), clie
         if cuenta.cliente_id != cliente_id:
             raise HTTPException(status_code=403, detail="No autorizado para crear cuenta para otro cliente")
         
-        query = text("SELECT * FROM CUENTA WHERE CUENTA_ID = :cuenta_id")
-        result = db.execute(query, {"cuenta_id": cuenta.cuenta_id})
-        if result.fetchone():
-            raise HTTPException(status_code=400, detail="Cuenta ya existe")
-        
+        cuenta_id = str(uuid.uuid4())[:10]  # Generar ID único
         query = text("""
             INSERT INTO CUENTA (
-                CUENTA_ID, CLIENTE_ID, CUENTA_NOMBRE, CUENTA_SALDO,
+                CLIENTE_ID, CUENTA_NOMBRE, CUENTA_SALDO,
                 CUENTA_APERTURA, CUENTA_ESTADO, CUENTA_LIMITE_TRANS_WEB,
                 CUENTA_LIMITE_TRANS_MOVIL
             ) VALUES (
-                :cuenta_id, :cliente_id, :nombre, :saldo, :apertura,
+                :cliente_id, :nombre, :saldo, :apertura,
                 :estado, :limite_web, :limite_movil
-            )
+            ) RETURNING CUENTA_ID
         """)
         values = {
-            "cuenta_id": cuenta.cuenta_id,
             "cliente_id": cuenta.cliente_id,
             "nombre": cuenta.cuenta_nombre,
             "saldo": cuenta.cuenta_saldo,
@@ -251,11 +251,12 @@ async def crear_cuenta(cuenta: CuentaCreate, db: Session = Depends(get_db), clie
             "limite_web": cuenta.cuenta_limite_trans_web,
             "limite_movil": cuenta.cuenta_limite_trans_movil
         }
-        db.execute(query, values)
+        result = db.execute(query, values)
+        cuenta_id = result.fetchone().cuenta_id
         db.commit()
         
         query = text("SELECT * FROM CUENTA WHERE CUENTA_ID = :cuenta_id")
-        result = db.execute(query, {"cuenta_id": cuenta.cuenta_id})
+        result = db.execute(query, {"cuenta_id": cuenta_id})
         cuenta_db = result.fetchone()
         columns = result.keys()
         return CuentaResponse(**{col: getattr(cuenta_db, col) for col in columns})
@@ -326,29 +327,26 @@ async def eliminar_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente
 @app.post("/cajeros/", response_model=CajeroResponse)
 async def crear_cajero(cajero: CajeroCreate, db: Session = Depends(get_db)):
     try:
-        query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id")
-        result = db.execute(query, {"cajero_id": cajero.cajero_id})
-        if result.fetchone():
-            raise HTTPException(status_code=400, detail="Cajero ya existe")
-        
+        cajero_id = str(uuid.uuid4())[:10]  # Generar ID único
         query = text("""
             INSERT INTO CAJERO (
                 CAJERO_ID, CAJERO_UBICACION, CAJERO_TIPO, CAJERO_ESTADO
             ) VALUES (
                 :cajero_id, :ubicacion, :tipo, :estado
-            )
+            ) RETURNING CAJERO_ID
         """)
         values = {
-            "cajero_id": cajero.cajero_id,
+            "cajero_id": cajero_id,
             "ubicacion": cajero.cajero_ubicacion,
             "tipo": cajero.cajero_tipo,
             "estado": cajero.cajero_estado
         }
-        db.execute(query, values)
+        result = db.execute(query, values)
+        cajero_id = result.fetchone().cajero_id
         db.commit()
         
         query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id")
-        result = db.execute(query, {"cajero_id": cajero.cajero_id})
+        result = db.execute(query, {"cajero_id": cajero_id})
         cajero_db = result.fetchone()
         columns = result.keys()
         return CajeroResponse(**{col: getattr(cajero_db, col) for col in columns})
@@ -409,6 +407,364 @@ async def eliminar_cajero(cajero_id: str, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al eliminar cajero: {str(e)}")
 
+# CRUD para Tarjeta
+@app.post("/tarjetas/", response_model=TarjetaResponse)
+async def crear_tarjeta(tarjeta: TarjetaCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("SELECT * FROM CUENTA WHERE CUENTA_ID = :cuenta_id")
+        result = db.execute(query, {"cuenta_id": tarjeta.cuenta_id})
+        cuenta = result.fetchone()
+        if not cuenta:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        if cuenta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta para esta cuenta")
+        
+        tarjeta_id = str(uuid.uuid4())[:16]  # Generar ID único
+        query = text("""
+            INSERT INTO TARJETA (
+                TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
+                TARJETA_FECHA_CADUCIDAD, TARJETA_FECHA_EMISION, TARJETA_ESTADO,
+                TARJETA_CVV, TARJETA_ESTILO
+            ) VALUES (
+                :tarjeta_id, :cuenta_id, :nombre, :pin_seguridad, :fecha_caducidad,
+                :fecha_emision, :estado, :cvv, :estilo
+            ) RETURNING TARJETA_ID
+        """)
+        values = {
+            "tarjeta_id": tarjeta_id,
+            "cuenta_id": tarjeta.cuenta_id,
+            "nombre": tarjeta.tarjeta_nombre,
+            "pin_seguridad": tarjeta.tarjeta_pin_seguridad,
+            "fecha_caducidad": tarjeta.tarjeta_fecha_caducidad,
+            "fecha_emision": tarjeta.tarjeta_fecha_emision,
+            "estado": tarjeta.tarjeta_estado,
+            "cvv": tarjeta.tarjeta_cvv,
+            "estilo": tarjeta.tarjeta_estilo
+        }
+        result = db.execute(query, values)
+        tarjeta_id = result.fetchone().tarjeta_id
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear tarjeta: {str(e)}")
+
+@app.get("/tarjetas/{tarjeta_id}", response_model=TarjetaResponse)
+async def leer_tarjeta(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    query = text("""
+        SELECT t.* FROM TARJETA t
+        JOIN CUENTA c ON t.CUENTA_ID = c.CUENTA_ID
+        WHERE t.TARJETA_ID = :tarjeta_id
+    """)
+    result = db.execute(query, {"tarjeta_id": tarjeta_id})
+    tarjeta = result.fetchone()
+    if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
+        raise HTTPException(status_code=404, detail="Tarjeta no encontrada o no autorizada")
+    columns = result.keys()
+    return TarjetaResponse(**{col: getattr(tarjeta, col) for col in columns})
+
+@app.put("/tarjetas/{tarjeta_id}", response_model=TarjetaResponse)
+async def actualizar_tarjeta(tarjeta_id: str, tarjeta: TarjetaUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT t.* FROM TARJETA t
+            JOIN CUENTA c ON t.CUENTA_ID = c.CUENTA_ID
+            WHERE t.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        if not tarjeta_db:
+            raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+        if tarjeta_db.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para actualizar esta tarjeta")
+        
+        update_data = tarjeta.dict(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
+        
+        set_clause = ", ".join(f"{key.upper()} = :{key}" for key in update_data.keys())
+        query = text(f"UPDATE TARJETA SET {set_clause} WHERE TARJETA_ID = :tarjeta_id")
+        values = {**update_data, "tarjeta_id": tarjeta_id}
+        db.execute(query, values)
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta: {str(e)}")
+
+@app.delete("/tarjetas/{tarjeta_id}")
+async def eliminar_tarjeta(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT t.* FROM TARJETA t
+            JOIN CUENTA c ON t.CUENTA_ID = c.CUENTA_ID
+            WHERE t.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta = result.fetchone()
+        if not tarjeta:
+            raise HTTPException(status_code=404, detail="Tarjeta no encontrada")
+        if tarjeta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para eliminar esta tarjeta")
+        
+        query = text("DELETE FROM TARJETA WHERE TARJETA_ID = :tarjeta_id")
+        db.execute(query, {"tarjeta_id": tarjeta_id})
+        db.commit()
+        return {"message": "Tarjeta eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al eliminar tarjeta: {str(e)}")
+
+# CRUD para Tarjeta de Crédito
+@app.post("/tarjetas-credito/", response_model=TarjetaCreditoResponse)
+async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("SELECT * FROM CUENTA WHERE CUENTA_ID = :cuenta_id")
+        result = db.execute(query, {"cuenta_id": tarjeta.cuenta_id})
+        cuenta = result.fetchone()
+        if not cuenta:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        if cuenta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta de crédito para esta cuenta")
+        
+        tarjeta_id = str(uuid.uuid4())[:16]  # Generar ID único
+        query = text("""
+            INSERT INTO TARJETA_DE_CREDITO (
+                TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
+                TARJETA_FECHA_CADUCIDAD, TARJETA_FECHA_EMISION, TARJETA_ESTADO,
+                TARJETA_CVV, TARJETA_ESTILO, TARJETACREDITO_CUPO,
+                TARJETACREDITO_PAGO_MINIMO, TAREJA_CREDITO_PAGO_TOTAL
+            ) VALUES (
+                :tarjeta_id, :cuenta_id, :nombre, :pin_seguridad, :fecha_caducidad,
+                :fecha_emision, :estado, :cvv, :estilo, :cupo, :pago_minimo, :pago_total
+            ) RETURNING TARJETA_ID
+        """)
+        values = {
+            "tarjeta_id": tarjeta_id,
+            "cuenta_id": tarjeta.cuenta_id,
+            "nombre": tarjeta.tarjeta_nombre,
+            "pin_seguridad": tarjeta.tarjeta_pin_seguridad,
+            "fecha_caducidad": tarjeta.tarjeta_fecha_caducidad,
+            "fecha_emision": tarjeta.tarjeta_fecha_emision,
+            "estado": tarjeta.tarjeta_estado,
+            "cvv": tarjeta.tarjeta_cvv,
+            "estilo": tarjeta.tarjeta_estilo,
+            "cupo": tarjeta.tarjetacredito_cupo,
+            "pago_minimo": tarjeta.tarjetacredito_pago_minimo,
+            "pago_total": tarjeta.tareja_credito_pago_total
+        }
+        result = db.execute(query, values)
+        tarjeta_id = result.fetchone().tarjeta_id
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaCreditoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de crédito: {str(e)}")
+
+@app.get("/tarjetas-credito/{tarjeta_id}", response_model=TarjetaCreditoResponse)
+async def leer_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    query = text("""
+        SELECT tc.* FROM TARJETA_DE_CREDITO tc
+        JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
+        WHERE tc.TARJETA_ID = :tarjeta_id
+    """)
+    result = db.execute(query, {"tarjeta_id": tarjeta_id})
+    tarjeta = result.fetchone()
+    if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
+        raise HTTPException(status_code=404, detail="Tarjeta de crédito no encontrada o no autorizada")
+    columns = result.keys()
+    return TarjetaCreditoResponse(**{col: getattr(tarjeta, col) for col in columns})
+
+@app.put("/tarjetas-credito/{tarjeta_id}", response_model=TarjetaCreditoResponse)
+async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT tc.* FROM TARJETA_DE_CREDITO tc
+            JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
+            WHERE tc.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        if not tarjeta_db:
+            raise HTTPException(status_code=404, detail="Tarjeta de crédito no encontrada")
+        if tarjeta_db.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para actualizar esta tarjeta de crédito")
+        
+        update_data = tarjeta.dict(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
+        
+        set_clause = ", ".join(f"{key.upper()} = :{key}" for key in update_data.keys())
+        query = text(f"UPDATE TARJETA_DE_CREDITO SET {set_clause} WHERE TARJETA_ID = :tarjeta_id")
+        values = {**update_data, "tarjeta_id": tarjeta_id}
+        db.execute(query, values)
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaCreditoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de crédito: {str(e)}")
+
+@app.delete("/tarjetas-credito/{tarjeta_id}")
+async def eliminar_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT tc.* FROM TARJETA_DE_CREDITO tc
+            JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
+            WHERE tc.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta = result.fetchone()
+        if not tarjeta:
+            raise HTTPException(status_code=404, detail="Tarjeta de crédito no encontrada")
+        if tarjeta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para eliminar esta tarjeta de crédito")
+        
+        query = text("DELETE FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
+        db.execute(query, {"tarjeta_id": tarifa_id})
+        db.commit()
+        return {"message": "Tarjeta de crédito eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al eliminar tarjeta de crédito: {str(e)}")
+
+# CRUD para Tarjeta de Débito
+@app.post("/tarjetas-debito/", response_model=TarjetaDebitoResponse)
+async def crear_tarjeta_debito(tarjeta: TarjetaDebitoCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("SELECT * FROM CUENTA WHERE CUENTA_ID = :cuenta_id")
+        result = db.execute(query, {"cuenta_id": tarjeta.cuenta_id})
+        cuenta = result.fetchone()
+        if not cuenta:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+        if cuenta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta de débito para esta cuenta")
+        
+        tarjeta_id = str(uuid.uuid4())[:16]  # Generar ID único
+        query = text("""
+            INSERT INTO TARJETA_DE_DEBITO (
+                TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
+                TARJETA_FECHA_CADUCIDAD, TARJETA_FECHA_EMISION, TARJETA_ESTADO,
+                TARJETA_CVV, TARJETA_ESTILO
+            ) VALUES (
+                :tarjeta_id, :cuenta_id, :nombre, :pin_seguridad, :fecha_caducidad,
+                :fecha_emision, :estado, :cvv, :estilo
+            ) RETURNING TARJETA_ID
+        """)
+        values = {
+            "tarjeta_id": tarjeta_id,
+            "cuenta_id": tarjeta.cuenta_id,
+            "nombre": tarjeta.tarjeta_nombre,
+            "pin_seguridad": tarjeta.tarjeta_pin_seguridad,
+            "fecha_caducidad": tarjeta.tarjeta_fecha_caducidad,
+            "fecha_emision": tarjeta.tarjeta_fecha_emision,
+            "estado": tarjeta.tarjeta_estado,
+            "cvv": tarjeta.tarjeta_cvv,
+            "estilo": tarjeta.tarjeta_estilo
+        }
+        result = db.execute(query, values)
+        tarjeta_id = result.fetchone().tarjeta_id
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA_DE_DEBITO WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaDebitoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de débito: {str(e)}")
+
+@app.get("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
+async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    query = text("""
+        SELECT td.* FROM TARJETA_DE_DEBITO td
+        JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
+        WHERE td.TARJETA_ID = :tarjeta_id
+    """)
+    result = db.execute(query, {"tarjeta_id": tarjeta_id})
+    tarjeta = result.fetchone()
+    if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
+        raise HTTPException(status_code=404, detail="Tarjeta de débito no encontrada o no autorizada")
+    columns = result.keys()
+    return TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns})
+
+@app.put("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
+async def actualizar_tarjeta_debito(tarjeta_id: str, tarjeta: TarjetaDebitoUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT td.* FROM TARJETA_DE_DEBITO td
+            JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
+            WHERE td.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        if not tarjeta_db:
+            raise HTTPException(status_code=404, detail="Tarjeta de débito no encontrada")
+        if tarjeta_db.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para actualizar esta tarjeta de débito")
+        
+        update_data = tarjeta.dict(exclude_unset=True)
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
+        
+        set_clause = ", ".join(f"{key.upper()} = :{key}" for key in update_data.keys())
+        query = text(f"UPDATE TARJETA_DE_DEBITO SET {set_clause} WHERE TARJETA_ID = :tarjeta_id")
+        values = {**update_data, "tarjeta_id": tarjeta_id}
+        db.execute(query, values)
+        db.commit()
+        
+        query = text("SELECT * FROM TARJETA_DE_DEBITO WHERE TARJETA_ID = :tarjeta_id")
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta_db = result.fetchone()
+        columns = result.keys()
+        return TarjetaDebitoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de débito: {str(e)}")
+
+@app.delete("/tarjetas-debito/{tarjeta_id}")
+async def eliminar_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    try:
+        query = text("""
+            SELECT td.* FROM TARJETA_DE_DEBITO td
+            JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
+            WHERE td.TARJETA_ID = :tarjeta_id
+        """)
+        result = db.execute(query, {"tarjeta_id": tarjeta_id})
+        tarjeta = result.fetchone()
+        if not tarjeta:
+            raise HTTPException(status_code=404, detail="Tarjeta de débito no encontrada")
+        if tarjeta.CLIENTE_ID != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para eliminar esta tarjeta de débito")
+        
+        query = text("DELETE FROM TARJETA_DE_DEBITO WHERE TARJETA_ID = :tarjeta_id")
+        db.execute(query, {"tarjeta_id": tarjeta_id})
+        db.commit()
+        return {"message": "Tarjeta de débito eliminada correctamente"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al eliminar tarjeta de débito: {str(e)}")
+
 # Endpoint para depósito
 @app.post("/transacciones/deposito", response_model=dict)
 async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -418,27 +774,57 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
         cuenta = result.fetchone()
         if not cuenta or cuenta.CLIENTE_ID != cliente_id:
             raise HTTPException(status_code=403, detail="Acceso no autorizado a esta cuenta")
+        
         transaccion_id = str(uuid.uuid4())[:8].upper()
         transaccion_costo = 0.50
         transaccion_fecha = datetime.now()
-        query = text(
-            "INSERT INTO TRANSACCION (TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO) "
-            "VALUES (:transaccion_id, :cuenta_id, :costo, :fecha, :recibo)"
-        )
-        db.execute(query, {"transaccion_id": transaccion_id, "cuenta_id": deposito.cuenta_id, "costo": transaccion_costo, "fecha": transaccion_fecha, "recibo": 1 if deposito.generar_recibo else None})
-        query = text(
-            "INSERT INTO DEPOSITO (TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO) "
-            "VALUES (:transaccion_id, :cuenta_id, :costo, :fecha, :recibo)"
-        )
-        db.execute(query, {"transaccion_id": transaccion_id, "cuenta_id": deposito.cuenta_id, "costo": transaccion_costo, "fecha": transaccion_fecha, "recibo": 1 if deposito.generar_recibo else None})
+        
+        query = text("""
+            INSERT INTO TRANSACCION (
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
+            ) VALUES (
+                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo
+            ) RETURNING TRANSACCION_ID
+        """)
+        result = db.execute(query, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": deposito.cuenta_id,
+            "costo": transaccion_costo,
+            "fecha": transaccion_fecha,
+            "recibo": 1 if deposito.generar_recibo else None
+        })
+        transaccion_id = result.fetchone().transaccion_id
+        
+        query = text("""
+            INSERT INTO DEPOSITO (
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
+            ) VALUES (
+                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo
+            )
+        """)
+        db.execute(query, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": deposito.cuenta_id,
+            "costo": transaccion_costo,
+            "fecha": transaccion_fecha,
+            "recibo": 1 if deposito.generar_recibo else None
+        })
+        
         query = text("UPDATE CUENTA SET CUENTA_SALDO = CUENTA_SALDO + :monto WHERE CUENTA_ID = :cuenta_id")
         db.execute(query, {"monto": deposito.monto, "cuenta_id": deposito.cuenta_id})
+        
         recibo = None
         if deposito.generar_recibo and deposito.cajero_id:
             recibo_costo = 0.25
             query = text("INSERT INTO RECIBO (TRANSACCION_ID, CAJERO_ID, RECIBO_COSTO) VALUES (:transaccion_id, :cajero_id, :costo)")
             db.execute(query, {"transaccion_id": transaccion_id, "cajero_id": deposito.cajero_id, "costo": recibo_costo})
-            recibo = ReciboResponse(transaccion_id=transaccion_id, cajero_id=deposito.cajero_id, recibo_costo=recibo_costo, transaccion_fecha=transaccion_fecha)
+            recibo = ReciboResponse(
+                transaccion_id=transaccion_id,
+                cajero_id=deposito.cajero_id,
+                recibo_costo=recibo_costo,
+                transaccion_fecha=transaccion_fecha
+            )
+        
         db.commit()
         return {"transaccion_id": transaccion_id, "recibo": recibo.dict() if recibo else None}
     except Exception as e:
@@ -456,46 +842,116 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
             raise HTTPException(status_code=403, detail="Acceso no autorizado a esta cuenta")
         if cuenta.CUENTA_SALDO < retiro.monto:
             raise HTTPException(status_code=400, detail="Saldo insuficiente")
+        
         transaccion_id = str(uuid.uuid4())[:8].upper()
         transaccion_costo = 1.00 if retiro.usar_tarjeta else 0.75
         transaccion_fecha = datetime.now()
-        query = text(
-            "INSERT INTO TRANSACCION (TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO) "
-            "VALUES (:transaccion_id, :cuenta_id, :costo, :fecha, :recibo)"
-        )
-        db.execute(query, {"transaccion_id": transaccion_id, "cuenta_id": retiro.cuenta_id, "costo": transaccion_costo, "fecha": transaccion_fecha, "recibo": 1 if retiro.generar_recibo else None})
+        
+        query = text("""
+            INSERT INTO TRANSACCION (
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
+            ) VALUES (
+                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo
+            ) RETURNING TRANSACCION_ID
+        """)
+        result = db.execute(query, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": retiro.cuenta_id,
+            "costo": transaccion_costo,
+            "fecha": transaccion_fecha,
+            "recibo": 1 if retiro.generar_recibo else None
+        })
+        transaccion_id = result.fetchone().transaccion_id
+        
+        query = text("""
+            INSERT INTO RETIRO (
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA,
+                TRANSACCION_RECIBO, RETIRO_MONTO, RETIRO_MONTO_MAX
+            ) VALUES (
+                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo, :monto, :monto_max
+            )
+        """)
+        db.execute(query, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": retiro.cuenta_id,
+            "costo": transaccion_costo,
+            "fecha": transaccion_fecha,
+            "recibo": 1 if retiro.generar_recibo else None,
+            "monto": retiro.monto,
+            "monto_max": 1000
+        })
+        
         if retiro.usar_tarjeta and retiro.tarjeta_id:
             query = text("SELECT * FROM TARJETA WHERE TARJETA_ID = :tarjeta_id AND CUENTA_ID = :cuenta_id AND TARJETA_ESTADO = :estado")
             result = db.execute(query, {"tarjeta_id": retiro.tarjeta_id, "cuenta_id": retiro.cuenta_id, "estado": "ACTIVA"})
             tarjeta = result.fetchone()
             if not tarjeta:
                 raise HTTPException(status_code=404, detail="Tarjeta no encontrada o inactiva")
-            query = text(
-                "INSERT INTO RETIRO_CON_TARJETA (TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO, RETIRO_MONTO, RETIRO_MONTO_MAX, RETIROCT_TARJETA, RETIROCT_AID, RETIROCT_P22, RETIROCT_P38, RETIROCT_COSTO_INTERBANCARIO) "
-                "VALUES (:transaccion_id, :cuenta_id, :costo, :fecha, :recibo, :monto, :monto_max, :tarjeta, :aid, :p22, :p38, :costo_inter)"
-            )
+            query = text("""
+                INSERT INTO RETIRO_CON_TARJETA (
+                    TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA,
+                    TRANSACCION_RECIBO, RETIRO_MONTO, RETIRO_MONTO_MAX, RETIROCT_TARJETA,
+                    RETIROCT_AID, RETIROCT_P22, RETIROCT_P38, RETIROCT_COSTO_INTERBANCARIO
+                ) VALUES (
+                    :transaccion_id, :cuenta_id, :costo, :fecha, :recibo, :monto,
+                    :monto_max, :tarjeta, :aid, :p22, :p38, :costo_inter
+                )
+            """)
             db.execute(query, {
-                "transaccion_id": transaccion_id, "cuenta_id": retiro.cuenta_id, "costo": transaccion_costo, "fecha": transaccion_fecha,
-                "recibo": 1 if retiro.generar_recibo else None, "monto": retiro.monto, "monto_max": 1000,
-                "tarjeta": retiro.tarjeta_id, "aid": "A0000000041010", "p22": "123", "p38": "123456", "costo_inter": 0.10
+                "transaccion_id": transaccion_id,
+                "cuenta_id": retiro.cuenta_id,
+                "costo": transaccion_costo,
+                "fecha": transaccion_fecha,
+                "recibo": 1 if retiro.generar_recibo else None,
+                "monto": retiro.monto,
+                "monto_max": 1000,
+                "tarjeta": retiro.tarjeta_id,
+                "aid": "A0000000041010",
+                "p22": "123",
+                "p38": "123456",
+                "costo_inter": 0.10
             })
         else:
-            query = text(
-                "INSERT INTO RETIRO_SIN_TARJETA (TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO, RETIRO_MONTO) "
-                "VALUES (:transaccion_id, :cuenta_id, :costo, :fecha, :recibo, :monto)"
-            )
+            query = text("""
+                INSERT INTO RETIRO_SIN_TARJETA (
+                    TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA,
+                    TRANSACCION_RECIBO, RETIRO_MONTO, RETIRO_MONTO_MAX,
+                    RETIROST_CELULAR_BENEFICIARIO, RETIROST_CLAVE,
+                    RETIROST_DURACION, RETIROST_MAXIMO_RETIROS
+                ) VALUES (
+                    :transaccion_id, :cuenta_id, :costo, :fecha, :recibo, :monto,
+                    :monto_max, :celular_beneficiario, :clave, :duracion, :maximo_retiros
+                )
+            """)
             db.execute(query, {
-                "transaccion_id": transaccion_id, "cuenta_id": retiro.cuenta_id, "costo": transaccion_costo, "fecha": transaccion_fecha,
-                "recibo": 1 if retiro.generar_recibo else None, "monto": retiro.monto
+                "transaccion_id": transaccion_id,
+                "cuenta_id": retiro.cuenta_id,
+                "costo": transaccion_costo,
+                "fecha": transaccion_fecha,
+                "recibo": 1 if retiro.generar_recibo else None,
+                "monto": retiro.monto,
+                "monto_max": 1000,
+                "celular_beneficiario": "0999999999",  # Valor por defecto
+                "clave": "1234",  # Valor por defecto
+                "duracion": 24,  # Valor por defecto (horas)
+                "maximo_retiros": 1  # Valor por defecto
             })
+        
         query = text("UPDATE CUENTA SET CUENTA_SALDO = CUENTA_SALDO - :monto WHERE CUENTA_ID = :cuenta_id")
         db.execute(query, {"monto": retiro.monto, "cuenta_id": retiro.cuenta_id})
+        
         recibo = None
         if retiro.generar_recibo and retiro.cajero_id:
             recibo_costo = 0.25
             query = text("INSERT INTO RECIBO (TRANSACCION_ID, CAJERO_ID, RECIBO_COSTO) VALUES (:transaccion_id, :cajero_id, :costo)")
             db.execute(query, {"transaccion_id": transaccion_id, "cajero_id": retiro.cajero_id, "costo": recibo_costo})
-            recibo = ReciboResponse(transaccion_id=transaccion_id, cajero_id=retiro.cajero_id, recibo_costo=recibo_costo, transaccion_fecha=transaccion_fecha)
+            recibo = ReciboResponse(
+                transaccion_id=transaccion_id,
+                cajero_id=retiro.cajero_id,
+                recibo_costo=recibo_costo,
+                transaccion_fecha=transaccion_fecha
+            )
+        
         db.commit()
         return {"transaccion_id": transaccion_id, "recibo": recibo.dict() if recibo else None}
     except Exception as e:

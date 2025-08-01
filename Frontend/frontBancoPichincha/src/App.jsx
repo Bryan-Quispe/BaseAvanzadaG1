@@ -12,7 +12,7 @@ function App() {
 
   return (
     <Routes>
-      <Route path="/" element={isAuthenticated ? <Menu /> : <Login />} />
+      <Route path="/*" element={isAuthenticated ? <Menu /> : <Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

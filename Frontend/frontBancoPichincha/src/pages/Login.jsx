@@ -54,7 +54,7 @@ function Login() {
           </h2>
           <div className="mb-4">
             <label className="block text-sm font-semibold text-blue-900 mb-1">
-              Username
+              Usuario
             </label>
             <input
               type="text"
@@ -78,11 +78,14 @@ function Login() {
           </div>
           <button
             type="submit"
-            className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition"
+            className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition cursor-pointer"
           >
             Ingresar
           </button>
         </form>
+        <br></br>
+        <hr></hr>
+        <br></br>
         <p>No tienes cuenta? <button onClick={registro}><span className="text-blue-800 cursor-pointer">Crea una Ahora</span></button></p>
       </div>
 

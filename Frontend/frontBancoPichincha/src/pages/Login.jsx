@@ -1,53 +1,60 @@
 import { useState } from "react";
 
 function Login() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        try {
-            const response = await fetch("https://baseavanzadag1.onrender.com/token", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ email, password })
-            });
-            console.log("Response:", response.access_token);
-        } catch (error) {
-            console.error("Login failed:", error);
-        }
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      const response = await fetch("https://baseavanzadag1.onrender.com/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: formData.toString()
+      });
+
+      const data = await response.json();
+      localStorage.setItem("token", data.access_token);
+      window.location.reload();
+    } catch (error) {
+      console.error("Login failed:", error);
     }
+  };
 
-    return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
+  return (
+    <div className="flex items-center justify-center h-screen bg-white">
       <form
         onSubmit={handleLogin}
-        className="bg-white p-8 rounded-lg shadow-md w-96"
+        className="bg-white p-10 rounded-lg shadow-lg w-96 border border-gray-200"
       >
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          Iniciar Sesión
+        <h2 className="text-3xl font-bold mb-8 text-center text-blue-900">
+          Banco Pichincha
         </h2>
         <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-blue-900 mb-1">
             Correo Electrónico
           </label>
           <input
-            type="email"
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
         </div>
         <div className="mb-6">
-          <label className="block text-sm font-semibold text-gray-700 mb-1">
+          <label className="block text-sm font-semibold text-blue-900 mb-1">
             Contraseña
           </label>
           <input
             type="password"
-            className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -55,7 +62,7 @@ function Login() {
         </div>
         <button
           type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
+          className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition"
         >
           Ingresar
         </button>

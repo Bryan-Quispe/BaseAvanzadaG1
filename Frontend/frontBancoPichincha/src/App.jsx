@@ -5,7 +5,7 @@ import { Menu } from './pages/Menu.jsx';
 import Register from './pages/Register.jsx';
 import { useAuth } from './context/AuthContext';
 import RegisterConfirmation from  './pages/RegisterSuccesfull.jsx'
-import Dashboard from './pages/Prueba.jsx';
+import Dashboard from './pages/Dashboard.jsx';
 import CreateAccount from './pages/AccountCreate.jsx';
 
 function App() {

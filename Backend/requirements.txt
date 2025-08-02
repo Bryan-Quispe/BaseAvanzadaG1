@@ -7,4 +7,5 @@ python-jose==3.3.0
 pydantic==2.9.2
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.9
-pytz==2024.2  # Añadido para manejar zonas horarias
+pytz==2024.2
+email-validator==2.2.0  # Añadido para soportar EmailStr

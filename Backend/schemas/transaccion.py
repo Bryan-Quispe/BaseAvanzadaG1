@@ -1,19 +1,19 @@
 from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 import re
-import pytz  # Importar pytz para manejar zonas horarias
+import pytz
 
 # Esquemas para Cliente
 class ClienteBase(BaseModel):
-    cliente_nombres: str = Field(..., max_length=50, description="Nombres del cliente")
-    cliente_apellidos: str = Field(..., max_length=50, description="Apellidos del cliente")
-    cliente_correo: EmailStr = Field(..., description="Correo electrónico válido")
-    cliente_celular: str = Field(..., max_length=10, description="Número de celular (10 dígitos)")
-    cliente_direccion: str = Field(..., max_length=100, description="Dirección del cliente")
-    cliente_provincia: str = Field(..., max_length=50, description="Provincia")
-    cliente_ciudad: str = Field(..., max_length=50, description="Ciudad")
-    cliente_fchnacimiento: datetime = Field(..., description="Fecha de nacimiento")
+    cliente_nombres: str = Field(..., min_length=1, max_length=32, description="Nombres del cliente")
+    cliente_apellidos: str = Field(..., min_length=1, max_length=32, description="Apellidos del cliente")
+    cliente_correo: EmailStr = Field(..., max_length=64, description="Correo electrónico válido")
+    cliente_celular: str = Field(..., min_length=10, max_length=10, description="Número de celular (10 dígitos)")
+    cliente_direccion: str = Field(..., min_length=1, max_length=128, description="Dirección del cliente")
+    cliente_provincia: str = Field(..., min_length=1, max_length=32, description="Provincia")
+    cliente_ciudad: str = Field(..., min_length=1, max_length=32, description="Ciudad")
+    cliente_fchnacimiento: date = Field(..., description="Fecha de nacimiento")
 
     @validator('cliente_celular')
     def validate_celular(cls, v):
@@ -23,52 +23,50 @@ class ClienteBase(BaseModel):
 
     @validator('cliente_fchnacimiento')
     def validate_fecha_nacimiento(cls, v):
-        # Hacer que today sea aware con UTC
-        today = datetime.now(pytz.UTC)
-        # Si v es aware, usarlo directamente; si es naive, asignarle UTC
-        v_aware = v if v.tzinfo else v.replace(tzinfo=pytz.UTC)
-        age = (today - v_aware).days // 365
+        today = datetime.now(pytz.UTC).date()
+        age = (today - v).days // 365
         if age < 18:
             raise ValueError('El cliente debe ser mayor de 18 años')
         return v
 
 class ClienteCreate(ClienteBase):
-    cliente_id: str = Field(..., max_length=10, description="Cédula del cliente (10 dígitos)")
+    cliente_id: str = Field(..., min_length=10, max_length=10, description="Cédula del cliente (10 dígitos)")
+    cliente_contrasena: str = Field(..., min_length=6, description="Contraseña del cliente")
 
     @validator('cliente_id')
     def validate_cedula(cls, v):
         if not v.isdigit() or len(v) != 10:
             raise ValueError('La cédula debe ser un string de 10 dígitos')
-        # Opcional: Validación del dígito verificador de cédula ecuatoriana
-        # coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
-        # suma = sum(int(v[i]) * coef[i] if int(v[i]) * coef[i] < 10 else int(v[i]) * coef[i] - 9 for i in range(9))
-        # digito_verificador = (10 - (suma % 10)) % 10
-        # if digito_verificador != int(v[9]):
-        #     raise ValueError('Cédula inválida: dígito verificador incorrecto')
+        coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
+        suma = sum(int(v[i]) * coef[i] if int(v[i]) * coef[i] < 10 else int(v[i]) * coef[i] - 9 for i in range(9))
+        digito_verificador = (10 - (suma % 10)) % 10
+        if digito_verificador != int(v[9]):
+            raise ValueError('Cédula inválida: dígito verificador incorrecto')
         return v
 
 class ClienteUpdate(ClienteBase):
-    cliente_nombres: Optional[str] = None
-    cliente_apellidos: Optional[str] = None
-    cliente_correo: Optional[EmailStr] = None
-    cliente_celular: Optional[str] = None
-    cliente_direccion: Optional[str] = None
-    cliente_provincia: Optional[str] = None
-    cliente_ciudad: Optional[str] = None
-    cliente_fchnacimiento: Optional[datetime] = None
+    cliente_nombres: Optional[str] = Field(None, min_length=1, max_length=32)
+    cliente_apellidos: Optional[str] = Field(None, min_length=1, max_length=32)
+    cliente_correo: Optional[EmailStr] = Field(None, max_length=64)
+    cliente_celular: Optional[str] = Field(None, min_length=10, max_length=10)
+    cliente_direccion: Optional[str] = Field(None, min_length=1, max_length=128)
+    cliente_provincia: Optional[str] = Field(None, min_length=1, max_length=32)
+    cliente_ciudad: Optional[str] = Field(None, min_length=1, max_length=32)
+    cliente_fchnacimiento: Optional[date] = None
 
 class ClienteResponse(ClienteBase):
     cliente_id: str
-    cliente_contrasena: Optional[str] = None
     cuentas: List[str] = []
+
+    class Config:
+        from_attributes = True
 
 # Esquemas para Cuenta
 class CuentaBase(BaseModel):
-    cliente_id: str = Field(..., description="Cédula del cliente")
-    cuenta_nombre: str = Field(..., max_length=50, description="Nombre de la cuenta")
+    cuenta_nombre: str = Field(..., min_length=1, max_length=64, description="Nombre de la cuenta")
     cuenta_saldo: float = Field(..., ge=0, description="Saldo de la cuenta (no negativo)")
-    cuenta_apertura: datetime = Field(..., description="Fecha de apertura")
-    cuenta_estado: str = Field(..., description="Estado de la cuenta (ACTIVA/INACTIVA)")
+    cuenta_apertura: date = Field(..., description="Fecha de apertura")
+    cuenta_estado: str = Field(..., min_length=1, max_length=32, description="Estado de la cuenta (ACTIVA/INACTIVA)")
     cuenta_limite_trans_web: float = Field(..., ge=0, description="Límite de transacciones web")
     cuenta_limite_trans_movil: float = Field(..., ge=0, description="Límite de transacciones móviles")
 
@@ -78,30 +76,44 @@ class CuentaBase(BaseModel):
             raise ValueError('El estado debe ser ACTIVA o INACTIVA')
         return v
 
-    @validator('cuenta_apertura')
-    def validate_fecha_apertura(cls, v):
-        # Asegurar que la fecha sea aware
-        return v if v.tzinfo else v.replace(tzinfo=pytz.UTC)
-
 class CuentaCreate(CuentaBase):
-    pass
+    cliente_id: str = Field(..., min_length=10, max_length=10, description="Cédula del cliente")
+
+    @validator('cliente_id')
+    def validate_cliente_id(cls, v):
+        if not v.isdigit() or len(v) != 10:
+            raise ValueError('El cliente_id debe ser un string de 10 dígitos')
+        return v
 
 class CuentaUpdate(CuentaBase):
-    cliente_id: Optional[str] = None
-    cuenta_nombre: Optional[str] = None
-    cuenta_saldo: Optional[float] = None
-    cuenta_estado: Optional[str] = None
-    cuenta_limite_trans_web: Optional[float] = None
-    cuenta_limite_trans_movil: Optional[float] = None
+    cuenta_nombre: Optional[str] = Field(None, min_length=1, max_length=64)
+    cuenta_saldo: Optional[float] = Field(None, ge=0)
+    cuenta_estado: Optional[str] = Field(None, min_length=1, max_length=32)
+    cuenta_limite_trans_web: Optional[float] = Field(None, ge=0)
+    cuenta_limite_trans_movil: Optional[float] = Field(None, ge=0)
 
 class CuentaResponse(CuentaBase):
     cuenta_id: str
+    cliente_id: str
+
+    class Config:
+        from_attributes = True
+
+# Esquemas para Cuenta Corriente (para manejar sobregiro)
+class CuentaCorrienteCreate(CuentaCreate):
+    cuentatrans_sobregiro: Optional[float] = Field(None, ge=0, le=999.99, description="Límite de sobregiro (máximo 999.99)")
+
+class CuentaCorrienteUpdate(CuentaUpdate):
+    cuentatrans_sobregiro: Optional[float] = Field(None, ge=0, le=999.99, description="Límite de sobregiro (máximo 999.99)")
+
+class CuentaCorrienteResponse(CuentaResponse):
+    cuentatrans_sobregiro: Optional[float] = None
 
 # Esquemas para Cajero
 class CajeroBase(BaseModel):
-    cajero_ubicacion: str = Field(..., max_length=100, description="Ubicación del cajero")
-    cajero_tipo: str = Field(..., max_length=50, description="Tipo de cajero")
-    cajero_estado: str = Field(..., description="Estado del cajero (ACTIVO/INACTIVO)")
+    cajero_ubicacion: str = Field(..., min_length=1, max_length=128, description="Ubicación del cajero")
+    cajero_tipo: str = Field(..., min_length=1, max_length=16, description="Tipo de cajero")
+    cajero_estado: str = Field(..., min_length=1, max_length=16, description="Estado del cajero (ACTIVO/INACTIVO)")
 
     @validator('cajero_estado')
     def validate_estado(cls, v):
@@ -113,23 +125,26 @@ class CajeroCreate(CajeroBase):
     pass
 
 class CajeroUpdate(CajeroBase):
-    cajero_ubicacion: Optional[str] = None
-    cajero_tipo: Optional[str] = None
-    cajero_estado: Optional[str] = None
+    cajero_ubicacion: Optional[str] = Field(None, min_length=1, max_length=128)
+    cajero_tipo: Optional[str] = Field(None, min_length=1, max_length=16)
+    cajero_estado: Optional[str] = Field(None, min_length=1, max_length=16)
 
 class CajeroResponse(CajeroBase):
-    cajero_id: str
+    cajero_id: str = Field(..., min_length=1, max_length=10)
+
+    class Config:
+        from_attributes = True
 
 # Esquemas para Tarjeta
 class TarjetaBase(BaseModel):
-    cuenta_id: str = Field(..., description="ID de la cuenta asociada")
-    tarjeta_nombre: str = Field(..., max_length=50, description="Nombre en la tarjeta")
-    tarjeta_pin_seguridad: str = Field(..., max_length=6, description="PIN de seguridad")
-    tarjeta_fecha_caducidad: datetime = Field(..., description="Fecha de caducidad")
-    tarjeta_fecha_emision: datetime = Field(..., description="Fecha de emisión")
-    tarjeta_estado: str = Field(..., description="Estado de la tarjeta (ACTIVA/INACTIVA)")
-    tarjeta_cvv: str = Field(..., max_length=3, description="CVV de la tarjeta")
-    tarjeta_estilo: str = Field(..., max_length=50, description="Estilo de la tarjeta")
+    cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta asociada")
+    tarjeta_nombre: str = Field(..., min_length=1, max_length=32, description="Nombre en la tarjeta")
+    tarjeta_pin_seguridad: str = Field(..., min_length=6, max_length=6, description="PIN de seguridad (6 dígitos)")
+    tarjeta_fecha_caducidad: date = Field(..., description="Fecha de caducidad")
+    tarjeta_fecha_emision: date = Field(..., description="Fecha de emisión")
+    tarjeta_estado: str = Field(..., min_length=1, max_length=16, description="Estado de la tarjeta (ACTIVA/INACTIVA)")
+    tarjeta_cvv: str = Field(..., min_length=3, max_length=3, description="CVV de la tarjeta (3 dígitos)")
+    tarjeta_estilo: str = Field(..., min_length=1, max_length=64, description="Estilo de la tarjeta")
 
     @validator('tarjeta_pin_seguridad')
     def validate_pin(cls, v):
@@ -149,94 +164,112 @@ class TarjetaBase(BaseModel):
             raise ValueError('El estado debe ser ACTIVA o INACTIVA')
         return v
 
-    @validator('tarjeta_fecha_caducidad', 'tarjeta_fecha_emision')
-    def validate_fechas(cls, v):
-        # Asegurar que las fechas sean aware
-        return v if v.tzinfo else v.replace(tzinfo=pytz.UTC)
+    @validator('tarjeta_fecha_caducidad')
+    def validate_fecha_caducidad(cls, v, values):
+        today = datetime.now(pytz.UTC).date()
+        if v < today:
+            raise ValueError('La fecha de caducidad no puede estar en el pasado')
+        if 'tarjeta_fecha_emision' in values and v <= values['tarjeta_fecha_emision']:
+            raise ValueError('La fecha de caducidad debe ser posterior a la fecha de emisión')
+        return v
 
 class TarjetaCreate(TarjetaBase):
     pass
 
 class TarjetaUpdate(TarjetaBase):
-    cuenta_id: Optional[str] = None
-    tarjeta_nombre: Optional[str] = None
-    tarjeta_pin_seguridad: Optional[str] = None
-    tarjeta_fecha_caducidad: Optional[datetime] = None
-    tarjeta_fecha_emision: Optional[datetime] = None
-    tarjeta_estado: Optional[str] = None
-    tarjeta_cvv: Optional[str] = None
-    tarjeta_estilo: Optional[str] = None
+    cuenta_id: Optional[str] = Field(None, min_length=1, max_length=10)
+    tarjeta_nombre: Optional[str] = Field(None, min_length=1, max_length=32)
+    tarjeta_pin_seguridad: Optional[str] = Field(None, min_length=6, max_length=6)
+    tarjeta_fecha_caducidad: Optional[date] = None
+    tarjeta_fecha_emision: Optional[date] = None
+    tarjeta_estado: Optional[str] = Field(None, min_length=1, max_length=16)
+    tarjeta_cvv: Optional[str] = Field(None, min_length=3, max_length=3)
+    tarjeta_estilo: Optional[str] = Field(None, min_length=1, max_length=64)
 
 class TarjetaResponse(TarjetaBase):
-    tarjeta_id: str
+    tarjeta_id: str = Field(..., min_length=1, max_length=16)
+
+    class Config:
+        from_attributes = True
 
 # Esquemas para Tarjeta de Crédito
-class TarjetaCreditoBase(TarjetaBase):
-    tarjetacredito_cupo: float = Field(..., ge=0, description="Cupo de la tarjeta de crédito")
-    tarjetacredito_pago_minimo: float = Field(..., ge=0, description="Pago mínimo")
-    tarjeta_credito_pago_total: float = Field(..., ge=0, description="Pago total")
+class TarjetaCreditoCreate(TarjetaBase):
+    tarjetacredito_cupo: float = Field(..., ge=0, le=999999.99, description="Cupo de la tarjeta de crédito (máximo 999999.99)")
+    tarjetacredito_pago_minimo: float = Field(..., ge=0, le=999999.99, description="Pago mínimo (máximo 999999.99)")
+    tarjeta_credito_pago_total: float = Field(..., ge=0, le=999999.99, description="Pago total (máximo 999999.99)")
 
-class TarjetaCreditoCreate(TarjetaCreditoBase):
-    pass
+class TarjetaCreditoUpdate(TarjetaBase):
+    cuenta_id: Optional[str] = Field(None, min_length=1, max_length=10)
+    tarjeta_nombre: Optional[str] = Field(None, min_length=1, max_length=32)
+    tarjeta_pin_seguridad: Optional[str] = Field(None, min_length=6, max_length=6)
+    tarjeta_fecha_caducidad: Optional[date] = None
+    tarjeta_fecha_emision: Optional[date] = None
+    tarjeta_estado: Optional[str] = Field(None, min_length=1, max_length=16)
+    tarjeta_cvv: Optional[str] = Field(None, min_length=3, max_length=3)
+    tarjeta_estilo: Optional[str] = Field(None, min_length=1, max_length=64)
+    tarjetacredito_cupo: Optional[float] = Field(None, ge=0, le=999999.99)
+    tarjetacredito_pago_minimo: Optional[float] = Field(None, ge=0, le=999999.99)
+    tarjeta_credito_pago_total: Optional[float] = Field(None, ge=0, le=999999.99)
 
-class TarjetaCreditoUpdate(TarjetaCreditoBase):
-    cuenta_id: Optional[str] = None
-    tarjeta_nombre: Optional[str] = None
-    tarjeta_pin_seguridad: Optional[str] = None
-    tarjeta_fecha_caducidad: Optional[datetime] = None
-    tarjeta_fecha_emision: Optional[datetime] = None
-    tarjeta_estado: Optional[str] = None
-    tarjeta_cvv: Optional[str] = None
-    tarjeta_estilo: Optional[str] = None
-    tarjetacredito_cupo: Optional[float] = None
+class TarjetaCreditoResponse(TarjetaBase):
+    tarjeta_id: str = Field(..., min_length=1, max_length=16)
+    tarjetacredito_cupo: float
     tarjetacredito_pago_minimo: Optional[float] = None
     tarjeta_credito_pago_total: Optional[float] = None
 
-class TarjetaCreditoResponse(TarjetaCreditoBase):
-    tarjeta_id: str
+    class Config:
+        from_attributes = True
 
 # Esquemas para Tarjeta de Débito
-class TarjetaDebitoBase(TarjetaBase):
+class TarjetaDebitoCreate(TarjetaBase):
     pass
 
-class TarjetaDebitoCreate(TarjetaDebitoBase):
-    pass
+class TarjetaDebitoUpdate(TarjetaBase):
+    cuenta_id: Optional[str] = Field(None, min_length=1, max_length=10)
+    tarjeta_nombre: Optional[str] = Field(None, min_length=1, max_length=32)
+    tarjeta_pin_seguridad: Optional[str] = Field(None, min_length=6, max_length=6)
+    tarjeta_fecha_caducidad: Optional[date] = None
+    tarjeta_fecha_emision: Optional[date] = None
+    tarjeta_estado: Optional[str] = Field(None, min_length=1, max_length=16)
+    tarjeta_cvv: Optional[str] = Field(None, min_length=3, max_length=3)
+    tarjeta_estilo: Optional[str] = Field(None, min_length=1, max_length=64)
 
-class TarjetaDebitoUpdate(TarjetaDebitoBase):
-    cuenta_id: Optional[str] = None
-    tarjeta_nombre: Optional[str] = None
-    tarjeta_pin_seguridad: Optional[str] = None
-    tarjeta_fecha_caducidad: Optional[datetime] = None
-    tarjeta_fecha_emision: Optional[datetime] = None
-    tarjeta_estado: Optional[str] = None
-    tarjeta_cvv: Optional[str] = None
-    tarjeta_estilo: Optional[str] = None
+class TarjetaDebitoResponse(TarjetaBase):
+    tarjeta_id: str = Field(..., min_length=1, max_length=16)
 
-class TarjetaDebitoResponse(TarjetaDebitoBase):
-    tarjeta_id: str
+    class Config:
+        from_attributes = True
 
 # Esquemas para Transacciones
 class DepositoRequest(BaseModel):
-    cuenta_id: str = Field(..., description="ID de la cuenta")
-    monto: float = Field(..., gt=0, description="Monto del depósito (positivo)")
+    cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta")
+    monto: float = Field(..., gt=0, le=999999.99, description="Monto del depósito (positivo, máximo 999999.99)")
     generar_recibo: bool = Field(..., description="Generar recibo")
-    cajero_id: Optional[str] = None
+    cajero_id: Optional[str] = Field(None, min_length=1, max_length=10, description="ID del cajero")
 
 class RetiroRequest(BaseModel):
-    cuenta_id: str = Field(..., description="ID de la cuenta")
-    monto: float = Field(..., gt=0, description="Monto del retiro (positivo)")
+    cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta")
+    monto: float = Field(..., gt=0, le=1000, description="Monto del retiro (positivo, máximo 1000)")
     generar_recibo: bool = Field(..., description="Generar recibo")
-    cajero_id: str = Field(..., description="ID del cajero")
+    cajero_id: str = Field(..., min_length=1, max_length=10, description="ID del cajero")
     usar_tarjeta: bool = Field(..., description="Usar tarjeta")
-    tarjeta_id: Optional[str] = None
+    tarjeta_id: Optional[str] = Field(None, min_length=1, max_length=16, description="ID de la tarjeta")
+
+    @validator('tarjeta_id')
+    def validate_tarjeta_id(cls, v, values):
+        if values.get('usar_tarjeta') and not v:
+            raise ValueError('El tarjeta_id es obligatorio si usar_tarjeta es True')
+        return v
 
 class ReciboResponse(BaseModel):
-    transaccion_id: str
-    cajero_id: str
-    recibo_costo: float
-    transaccion_fecha: datetime
+    transaccion_id: str = Field(..., min_length=1, max_length=8, description="ID de la transacción")
+    cajero_id: str = Field(..., min_length=1, max_length=10, description="ID del cajero")
+    recibo_costo: float = Field(..., ge=0, le=999.99, description="Costo del recibo (máximo 999.99)")
+    transaccion_fecha: datetime = Field(..., description="Fecha de la transacción")
 
     @validator('transaccion_fecha')
     def validate_transaccion_fecha(cls, v):
-        
         return v if v.tzinfo else v.replace(tzinfo=pytz.UTC)
+
+    class Config:
+        from_attributes = True

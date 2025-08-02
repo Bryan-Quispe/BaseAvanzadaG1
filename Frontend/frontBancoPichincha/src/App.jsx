@@ -19,7 +19,7 @@ function App() {
       <Route path="/*" element={isAuthenticated ? <Menu /> : <Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/createAccount" element={isAuthenticated? <CreateAccount /> : <Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/dashboard" element={isAuthenticated? <Dashboard />: <Login/>} />
       <Route path="/registerSuccesfull" element={isRegisterSuccesfull?<RegisterConfirmation />:<Register/>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

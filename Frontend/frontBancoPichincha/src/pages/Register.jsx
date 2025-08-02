@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function InputText({ label, name, type = "text", value, onChange, required = false, pattern, title, placeholder }) {
   return (
@@ -7,7 +7,16 @@ function InputText({ label, name, type = "text", value, onChange, required = fal
       <label className="block text-sm font-semibold text-blue-900 mb-1" htmlFor={name}>
         {label} {required && "*"}
       </label>
-      <input id={name} name={name} type={type} value={value} onChange={onChange} required={required} pattern={pattern} title={title} placeholder={placeholder}
+      <input
+        id={name}
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        required={required}
+        pattern={pattern}
+        title={title}
+        placeholder={placeholder}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
       />
     </div>
@@ -15,8 +24,9 @@ function InputText({ label, name, type = "text", value, onChange, required = fal
 }
 
 function Register() {
-   const navigate = useNavigate();
-  
+  const [loading, setLoading] = useState(true); // Estado de carga inicial
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     cliente_id: "",
     cliente_nombres: "",
@@ -29,9 +39,17 @@ function Register() {
     cliente_fchnacimiento: "",
   });
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -39,8 +57,7 @@ function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-
-    console.log("registro");
+    setLoading(true);
 
     try {
       const response = await fetch("https://baseavanzadag1.onrender.com/clientes/", {
@@ -55,12 +72,11 @@ function Register() {
         const errorData = await response.json();
         console.error("Error al registrar:", errorData.detail || errorData);
         alert("Error al registrar cliente.");
+        setLoading(false);
         return;
       }
 
-      const data = await response.json();
-      console.log("Cliente registrado con éxito:", data);
-      alert("Cliente registrado con éxito.");
+      await response.json();
 
       setFormData({
         cliente_id: "",
@@ -71,25 +87,56 @@ function Register() {
         cliente_direccion: "",
         cliente_provincia: "",
         cliente_ciudad: "",
-        cliente_fchnacimiento: ""
+        cliente_fchnacimiento: "",
       });
 
-      sessionStorage.setItem("registerSuccesfull",true);
-      navigate('/registerSuccesfull');
+      sessionStorage.setItem("registerSuccesfull", true);
+      navigate("/registerSuccesfull");
     } catch (error) {
-      sessionStorage.setItem("registerSuccesfull",false);
+      sessionStorage.setItem("registerSuccesfull", false);
       console.error("Error en el registro:", error);
       alert("Hubo un error al registrar el cliente.");
+      setLoading(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <svg
+            className="animate-spin h-10 w-10 text-yellow-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+          <span className="text-xl font-semibold text-yellow-400">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex py-7 items-center justify-center bg-white">
       <div className="bg-white p-10 rounded-lg shadow-lg w-lg border border-gray-200">
         <form onSubmit={handleRegister}>
           <h2 className="text-3xl mb-8 text-center text-blue-900">
-            ¡Empecemos! <br />Ingresa tus datos
+            ¡Empecemos! <br />
+            Ingresa tus datos
           </h2>
 
           <InputText
@@ -177,8 +224,39 @@ function Register() {
             required
           />
 
-          <button type="submit" className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition cursor-pointer">
-            Continuar
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full flex items-center justify-center gap-2 bg-yellow-400 text-blue-900 font-bold py-2 rounded-md transition cursor-pointer ${loading ? "opacity-70 cursor-not-allowed" : "hover:bg-yellow-500"
+              }`}
+          >
+            {loading ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5 text-blue-900"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  ></path>
+                </svg>
+                Cargando...
+              </>
+            ) : (
+              "Continuar"
+            )}
           </button>
         </form>
       </div>

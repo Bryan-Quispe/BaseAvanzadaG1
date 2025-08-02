@@ -5,6 +5,8 @@ import { Menu } from './pages/Menu.jsx';
 import Register from './pages/Register.jsx';
 import { useAuth } from './context/AuthContext';
 import RegisterConfirmation from  './pages/RegisterSuccesfull.jsx'
+import Dashboard from './pages/Prueba.jsx';
+import CreateAccount from './pages/AccountCreate.jsx';
 
 function App() {
   const { token } = useAuth();
@@ -16,6 +18,8 @@ function App() {
     <Routes>
       <Route path="/*" element={isAuthenticated ? <Menu /> : <Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/createAccount" element={isAuthenticated? <CreateAccount /> : <Login />} />
+      <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/registerSuccesfull" element={isRegisterSuccesfull?<RegisterConfirmation />:<Register/>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>

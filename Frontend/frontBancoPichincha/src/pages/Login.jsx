@@ -28,15 +28,22 @@ function Login() {
       });
 
       const data = await response.json();
-
-      const user = await fetch(`https://baseavanzadag1.onrender.com/clientes/${username}`, {
+      
+      const userResponse = await fetch(`https://baseavanzadag1.onrender.com/clientes/${username}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
+          "Authorization": `Bearer ${data.access_token}`
         }
       });
 
+      if (!userResponse.ok) {
+        throw new Error("No se pudo obtener el usuario");
+      }
+
+      const user = await userResponse.json();
+
+      sessionStorage.setItem("user", JSON.stringify(user));
 
       login(data.access_token);
 

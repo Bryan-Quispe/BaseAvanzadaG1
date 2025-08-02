@@ -4,16 +4,19 @@ import Login from './pages/Login.jsx';
 import { Menu } from './pages/Menu.jsx';
 import Register from './pages/Register.jsx';
 import { useAuth } from './context/AuthContext';
+import RegisterConfirmation from  './pages/RegisterSuccesfull.jsx'
 
 function App() {
   const { token } = useAuth();
 
   const isAuthenticated = token !== null;
+  const isRegisterSuccesfull = sessionStorage.getItem("registerSuccesfull");
 
   return (
     <Routes>
       <Route path="/*" element={isAuthenticated ? <Menu /> : <Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/registerSuccesfull" element={isRegisterSuccesfull?<RegisterConfirmation />:<Register/>} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );

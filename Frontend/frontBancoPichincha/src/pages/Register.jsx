@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from 'react-router-dom';
 
 function InputText({ label, name, type = "text", value, onChange, required = false, pattern, title, placeholder }) {
   return (
@@ -14,6 +15,8 @@ function InputText({ label, name, type = "text", value, onChange, required = fal
 }
 
 function Register() {
+   const navigate = useNavigate();
+  
   const [formData, setFormData] = useState({
     cliente_id: "",
     cliente_nombres: "",
@@ -70,9 +73,11 @@ function Register() {
         cliente_ciudad: "",
         cliente_fchnacimiento: ""
       });
-      // navigate("/login"); // si estás usando React Router
 
+      sessionStorage.setItem("registerSuccesfull",true);
+      navigate('/registerSuccesfull');
     } catch (error) {
+      sessionStorage.setItem("registerSuccesfull",false);
       console.error("Error en el registro:", error);
       alert("Hubo un error al registrar el cliente.");
     }

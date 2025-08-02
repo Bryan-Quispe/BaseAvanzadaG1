@@ -36,8 +36,48 @@ function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    console.log("Registro:", formData);
+
+    console.log("registro");
+
+    try {
+      const response = await fetch("https://baseavanzadag1.onrender.com/clientes/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Error al registrar:", errorData.detail || errorData);
+        alert("Error al registrar cliente.");
+        return;
+      }
+
+      const data = await response.json();
+      console.log("Cliente registrado con éxito:", data);
+      alert("Cliente registrado con éxito.");
+
+      setFormData({
+        cliente_id: "",
+        cliente_nombres: "",
+        cliente_apellidos: "",
+        cliente_correo: "",
+        cliente_celular: "",
+        cliente_direccion: "",
+        cliente_provincia: "",
+        cliente_ciudad: "",
+        cliente_fchnacimiento: ""
+      });
+      // navigate("/login"); // si estás usando React Router
+
+    } catch (error) {
+      console.error("Error en el registro:", error);
+      alert("Hubo un error al registrar el cliente.");
+    }
   };
+
 
   return (
     <div className="flex py-7 items-center justify-center bg-white">

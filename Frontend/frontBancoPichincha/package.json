@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
+<<<<<<< HEAD
     "bootstrap-icons": "^1.13.1",
+=======
+    "jwt-decode": "^4.0.0",
+>>>>>>> 95b1cfaf72d77656d0f0648e7b4a97438bfb108c
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",

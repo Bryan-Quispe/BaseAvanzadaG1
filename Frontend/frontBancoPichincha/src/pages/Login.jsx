@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const registro = () => {
     navigate('/register');
@@ -26,20 +28,25 @@ function Login() {
       });
 
       const data = await response.json();
-
-      localStorage.setItem("token", data.access_token);
-      const user = await fetch(`https://baseavanzadag1.onrender.com/clientes/${username}`, {
-        method: "POST",
+      
+      const userResponse = await fetch(`https://baseavanzadag1.onrender.com/clientes/${username}`, {
+        method: "GET",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`
-        },
-        body: formData.toString()
+          "Authorization": `Bearer ${data.access_token}`
+        }
       });
 
-      console.log(user);
+      if (!userResponse.ok) {
+        throw new Error("No se pudo obtener el usuario");
+      }
 
-      window.location.reload();
+      const user = await userResponse.json();
+
+      sessionStorage.setItem("user", JSON.stringify(user));
+
+      login(data.access_token);
+
     } catch (error) {
       console.error("Login failed:", error);
     }
@@ -54,7 +61,7 @@ function Login() {
           </h2>
           <div className="mb-4">
             <label className="block text-sm font-semibold text-blue-900 mb-1">
-              Correo Electrónico
+              Usuario
             </label>
             <input
               type="text"
@@ -78,11 +85,14 @@ function Login() {
           </div>
           <button
             type="submit"
-            className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition"
+            className="w-full bg-yellow-400 text-blue-900 font-bold py-2 rounded-md hover:bg-yellow-500 transition cursor-pointer"
           >
             Ingresar
           </button>
         </form>
+        <br></br>
+        <hr></hr>
+        <br></br>
         <p>No tienes cuenta? <button onClick={registro}><span className="text-blue-800 cursor-pointer">Crea una Ahora</span></button></p>
       </div>
 

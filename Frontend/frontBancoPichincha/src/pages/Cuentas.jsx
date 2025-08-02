@@ -1,7 +1,7 @@
 import { useState,useEffect, use } from "react";
 import Header from "../components/Menu/Header";
-import Sidebar from "../components/Menu/Sidebar";
 import MainContent from "../components/Menu/MainContent";
+import Sidebar from "../components/Menu/Sidebar";
 
 function Cuentas(token) {
   const [NombreUsuario, setNombre] = useState("");

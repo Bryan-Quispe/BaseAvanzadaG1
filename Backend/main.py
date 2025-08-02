@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field  # Added Field import
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -33,6 +33,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Endpoint raíz
+@app.get("/")
+async def root():
+    return {"message": "Bienvenido a la API de Banco Pichincha"}
 
 # Configuración de JWT y hashing
 SECRET_KEY = os.getenv("JWT_SECRET")
@@ -68,10 +73,10 @@ class Token(BaseModel):
     token_type: str
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+    current_password: str = Field(..., min_length=6, description="Contraseña actual")
+    new_password: str = Field(..., min_length=6, description="Nueva contraseña")
 
-# Endpoint de login
+# Endpoint de login (público)
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
@@ -91,8 +96,8 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# Endpoint para cambiar contraseña
-@app.post("/clientes/change-password/")
+# Endpoint para cambiar contraseña (protegido)
+@app.post("/clientes/change-password/", response_model=dict)
 async def change_password(request: ChangePasswordRequest, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
         query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
@@ -117,9 +122,14 @@ async def change_password(request: ChangePasswordRequest, db: Session = Depends(
 @app.post("/clientes/", response_model=ClienteResponse)
 async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
     try:
+        # Verificar si la cédula ya existe
+        query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
+        result = db.execute(query, {"cliente_id": cliente.cliente_id})
+        if result.fetchone():
+            raise HTTPException(status_code=400, detail="La cédula ya está registrada")
+        
         # Establecer contraseña inicial "123456"
         hashed_password = pwd_context.hash("123456")
-        cliente_id = str(uuid.uuid4())[:10]  # Generar ID único
         
         query = text("""
             INSERT INTO CLIENTE (
@@ -132,7 +142,7 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
             ) RETURNING CLIENTE_ID
         """)
         values = {
-            "cliente_id": cliente_id,
+            "cliente_id": cliente.cliente_id,
             "nombres": cliente.cliente_nombres,
             "apellidos": cliente.cliente_apellidos,
             "correo": cliente.cliente_correo,
@@ -158,16 +168,18 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
 
 @app.get("/clientes/", response_model=List[ClienteResponse])
 async def leer_todos_clientes(db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
-    query = text("SELECT * FROM CLIENTE")
-    result = db.execute(query)
+    query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
+    result = db.execute(query, {"cliente_id": cliente_id})
     clientes = result.fetchall()
     if not clientes:
-        raise HTTPException(status_code=404, detail="No se encontraron clientes")
+        raise HTTPException(status_code=404, detail="No se encontraron datos para este cliente")
     columns = result.keys()
     return [ClienteResponse(**{col: getattr(cliente, col) for col in columns}) for cliente in clientes]
 
 @app.get("/clientes/{cliente_id}", response_model=ClienteResponse)
-async def leer_cliente(cliente_id: str, db: Session = Depends(get_db)):
+async def leer_cliente(cliente_id: str, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
+    if cliente_id != current_user:
+        raise HTTPException(status_code=403, detail="No autorizado para ver los datos de otro cliente")
     query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
     result = db.execute(query, {"cliente_id": cliente_id})
     cliente = result.fetchone()
@@ -177,8 +189,11 @@ async def leer_cliente(cliente_id: str, db: Session = Depends(get_db)):
     return ClienteResponse(**{col: getattr(cliente, col) for col in columns})
 
 @app.put("/clientes/{cliente_id}", response_model=ClienteResponse)
-async def actualizar_cliente(cliente_id: str, cliente: ClienteUpdate, db: Session = Depends(get_db)):
+async def actualizar_cliente(cliente_id: str, cliente: ClienteUpdate, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     try:
+        if cliente_id != current_user:
+            raise HTTPException(status_code=403, detail="No autorizado para actualizar otro cliente")
+        
         query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
         result = db.execute(query, {"cliente_id": cliente_id})
         if not result.fetchone():
@@ -204,8 +219,11 @@ async def actualizar_cliente(cliente_id: str, cliente: ClienteUpdate, db: Sessio
         raise HTTPException(status_code=500, detail=f"Error al actualizar cliente: {str(e)}")
 
 @app.delete("/clientes/{cliente_id}")
-async def eliminar_cliente(cliente_id: str, db: Session = Depends(get_db)):
+async def eliminar_cliente(cliente_id: str, db: Session = Depends(get_db), current_user: str = Depends(get_current_user)):
     try:
+        if cliente_id != current_user:
+            raise HTTPException(status_code=403, detail="No autorizado para eliminar otro cliente")
+        
         query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
         result = db.execute(query, {"cliente_id": cliente_id})
         if not result.fetchone():
@@ -223,26 +241,27 @@ async def eliminar_cliente(cliente_id: str, db: Session = Depends(get_db)):
 @app.post("/cuentas/", response_model=CuentaResponse)
 async def crear_cuenta(cuenta: CuentaCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
+        if cuenta.cliente_id != cliente_id:
+            raise HTTPException(status_code=403, detail="No autorizado para crear cuenta para otro cliente")
+        
         query = text("SELECT * FROM CLIENTE WHERE CLIENTE_ID = :cliente_id")
         result = db.execute(query, {"cliente_id": cuenta.cliente_id})
         if not result.fetchone():
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
-        if cuenta.cliente_id != cliente_id:
-            raise HTTPException(status_code=403, detail="No autorizado para crear cuenta para otro cliente")
-        
         cuenta_id = str(uuid.uuid4())[:10]  # Generar ID único
         query = text("""
             INSERT INTO CUENTA (
-                CLIENTE_ID, CUENTA_NOMBRE, CUENTA_SALDO,
+                CUENTA_ID, CLIENTE_ID, CUENTA_NOMBRE, CUENTA_SALDO,
                 CUENTA_APERTURA, CUENTA_ESTADO, CUENTA_LIMITE_TRANS_WEB,
                 CUENTA_LIMITE_TRANS_MOVIL
             ) VALUES (
-                :cliente_id, :nombre, :saldo, :apertura,
+                :cuenta_id, :cliente_id, :nombre, :saldo, :apertura,
                 :estado, :limite_web, :limite_movil
             ) RETURNING CUENTA_ID
         """)
         values = {
+            "cuenta_id": cuenta_id,
             "cliente_id": cuenta.cliente_id,
             "nombre": cuenta.cuenta_nombre,
             "saldo": cuenta.cuenta_saldo,
@@ -270,7 +289,7 @@ async def leer_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id:
     result = db.execute(query, {"cuenta_id": cuenta_id})
     cuenta = result.fetchone()
     if not cuenta or cuenta.CLIENTE_ID != cliente_id:
-        raise HTTPException(status_code=404, detail="Cuenta no encontrada o no autorizada")
+        raise HTTPException(status_code=403, detail="Cuenta no encontrada o no autorizada")
     columns = result.keys()
     return CuentaResponse(**{col: getattr(cuenta, col) for col in columns})
 
@@ -288,6 +307,10 @@ async def actualizar_cuenta(cuenta_id: str, cuenta: CuentaUpdate, db: Session = 
         update_data = cuenta.dict(exclude_unset=True)
         if not update_data:
             raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
+        
+        # Evitar que se modifique el CLIENTE_ID
+        if 'cliente_id' in update_data:
+            raise HTTPException(status_code=400, detail="No se puede modificar el CLIENTE_ID")
         
         set_clause = ", ".join(f"{key.upper()} = :{key}" for key in update_data.keys())
         query = text(f"UPDATE CUENTA SET {set_clause} WHERE CUENTA_ID = :cuenta_id")
@@ -325,7 +348,7 @@ async def eliminar_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente
 
 # CRUD para Cajero
 @app.post("/cajeros/", response_model=CajeroResponse)
-async def crear_cajero(cajero: CajeroCreate, db: Session = Depends(get_db)):
+async def crear_cajero(cajero: CajeroCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
         cajero_id = str(uuid.uuid4())[:10]  # Generar ID único
         query = text("""
@@ -355,7 +378,7 @@ async def crear_cajero(cajero: CajeroCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error al crear cajero: {str(e)}")
 
 @app.get("/cajeros/{cajero_id}", response_model=CajeroResponse)
-async def leer_cajero(cajero_id: str, db: Session = Depends(get_db)):
+async def leer_cajero(cajero_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id")
     result = db.execute(query, {"cajero_id": cajero_id})
     cajero = result.fetchone()
@@ -365,7 +388,7 @@ async def leer_cajero(cajero_id: str, db: Session = Depends(get_db)):
     return CajeroResponse(**{col: getattr(cajero, col) for col in columns})
 
 @app.put("/cajeros/{cajero_id}", response_model=CajeroResponse)
-async def actualizar_cajero(cajero_id: str, cajero: CajeroUpdate, db: Session = Depends(get_db)):
+async def actualizar_cajero(cajero_id: str, cajero: CajeroUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
         query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id")
         result = db.execute(query, {"cajero_id": cajero_id})
@@ -392,7 +415,7 @@ async def actualizar_cajero(cajero_id: str, cajero: CajeroUpdate, db: Session = 
         raise HTTPException(status_code=500, detail=f"Error al actualizar cajero: {str(e)}")
 
 @app.delete("/cajeros/{cajero_id}")
-async def eliminar_cajero(cajero_id: str, db: Session = Depends(get_db)):
+async def eliminar_cajero(cajero_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
         query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id")
         result = db.execute(query, {"cajero_id": cajero_id})
@@ -464,7 +487,7 @@ async def leer_tarjeta(tarjeta_id: str, db: Session = Depends(get_db), cliente_i
     result = db.execute(query, {"tarjeta_id": tarjeta_id})
     tarjeta = result.fetchone()
     if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
-        raise HTTPException(status_code=404, detail="Tarjeta no encontrada o no autorizada")
+        raise HTTPException(status_code=403, detail="Tarjeta no encontrada o no autorizada")
     columns = result.keys()
     return TarjetaResponse(**{col: getattr(tarjeta, col) for col in columns})
 
@@ -543,7 +566,7 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
                 TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
                 TARJETA_FECHA_CADUCIDAD, TARJETA_FECHA_EMISION, TARJETA_ESTADO,
                 TARJETA_CVV, TARJETA_ESTILO, TARJETACREDITO_CUPO,
-                TARJETACREDITO_PAGO_MINIMO, TAREJA_CREDITO_PAGO_TOTAL
+                TARJETACREDITO_PAGO_MINIMO, TARJETA_CREDITO_PAGO_TOTAL
             ) VALUES (
                 :tarjeta_id, :cuenta_id, :nombre, :pin_seguridad, :fecha_caducidad,
                 :fecha_emision, :estado, :cvv, :estilo, :cupo, :pago_minimo, :pago_total
@@ -561,7 +584,7 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
             "estilo": tarjeta.tarjeta_estilo,
             "cupo": tarjeta.tarjetacredito_cupo,
             "pago_minimo": tarjeta.tarjetacredito_pago_minimo,
-            "pago_total": tarjeta.tareja_credito_pago_total
+            "pago_total": tarjeta.tarjeta_credito_pago_total
         }
         result = db.execute(query, values)
         tarjeta_id = result.fetchone().tarjeta_id
@@ -586,7 +609,7 @@ async def leer_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), c
     result = db.execute(query, {"tarjeta_id": tarjeta_id})
     tarjeta = result.fetchone()
     if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
-        raise HTTPException(status_code=404, detail="Tarjeta de crédito no encontrada o no autorizada")
+        raise HTTPException(status_code=403, detail="Tarjeta de crédito no encontrada o no autorizada")
     columns = result.keys()
     return TarjetaCreditoResponse(**{col: getattr(tarjeta, col) for col in columns})
 
@@ -640,7 +663,7 @@ async def eliminar_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db
             raise HTTPException(status_code=403, detail="No autorizado para eliminar esta tarjeta de crédito")
         
         query = text("DELETE FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
-        db.execute(query, {"tarjeta_id": tarifa_id})
+        db.execute(query, {"tarjeta_id": tarjeta_id})
         db.commit()
         return {"message": "Tarjeta de crédito eliminada correctamente"}
     except Exception as e:
@@ -704,7 +727,7 @@ async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cl
     result = db.execute(query, {"tarjeta_id": tarjeta_id})
     tarjeta = result.fetchone()
     if not tarjeta or tarjeta.CLIENTE_ID != cliente_id:
-        raise HTTPException(status_code=404, detail="Tarjeta de débito no encontrada o no autorizada")
+        raise HTTPException(status_code=403, detail="Tarjeta de débito no encontrada o no autorizada")
     columns = result.keys()
     return TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns})
 
@@ -775,6 +798,12 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
         if not cuenta or cuenta.CLIENTE_ID != cliente_id:
             raise HTTPException(status_code=403, detail="Acceso no autorizado a esta cuenta")
         
+        if deposito.cajero_id:
+            query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id AND CAJERO_ESTADO = :estado")
+            result = db.execute(query, {"cajero_id": deposito.cajero_id, "estado": "ACTIVO"})
+            if not result.fetchone():
+                raise HTTPException(status_code=404, detail="Cajero no encontrado o inactivo")
+        
         transaccion_id = str(uuid.uuid4())[:8].upper()
         transaccion_costo = 0.50
         transaccion_fecha = datetime.now()
@@ -842,6 +871,14 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
             raise HTTPException(status_code=403, detail="Acceso no autorizado a esta cuenta")
         if cuenta.CUENTA_SALDO < retiro.monto:
             raise HTTPException(status_code=400, detail="Saldo insuficiente")
+        
+        query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id AND CAJERO_ESTADO = :estado")
+        result = db.execute(query, {"cajero_id": retiro.cajero_id, "estado": "ACTIVO"})
+        if not result.fetchone():
+            raise HTTPException(status_code=404, detail="Cajero no encontrado o inactivo")
+        
+        if retiro.monto > cuenta.CUENTA_LIMITE_TRANS_MOVIL and retiro.usar_tarjeta:
+            raise HTTPException(status_code=400, detail="El monto excede el límite de transacciones móviles")
         
         transaccion_id = str(uuid.uuid4())[:8].upper()
         transaccion_costo = 1.00 if retiro.usar_tarjeta else 0.75

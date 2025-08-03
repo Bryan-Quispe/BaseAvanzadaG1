@@ -46,8 +46,8 @@ function AccountDetails(accountId) {
 
     return (
         <div className="flex py-7 items-center justify-center bg-white">
-            <div className="bg-white pt-6 pb-6 rounded-lg shadow-lg w-[60%] border border-gray-200">
-                <form >
+            <div className="w-[60%]">
+                <div className="bg-white pt-6 pb-6 rounded-lg shadow-lg mb-6  border border-gray-200">
                     <div className="mb-6">
                         <h2 className="text-3xl text-center text-blue-900">
                             $366.15
@@ -64,13 +64,57 @@ function AccountDetails(accountId) {
                         <div className="w-[30%] items-center">
                             <p className="text-blue-700"><i class="bi bi-share-fill"></i> Compartir nro.cuenta</p>
                         </div>
+                    </div>
+                </div>
+                <hr className="text-gray-300 mb-8"></hr>
+                <div>
+                    <h2 className="font-bold text-gray-700">Movimientos</h2>
+                </div>
+                <div className="bg-white pt-6 pb-6 mb-6">
+                    {/* Fecha 1 */}
+                    <p className="text-sm text-gray-500 mb-2 ml-2">Viernes, 1 ago. 2025</p>
 
+                    {/* Bloque de movimientos para esta fecha */}
+                    <div className="pt-4 pb-4 shadow-lg  mb-6 border border-gray-200 px-4">
+
+                        {/* Movimiento 1 */}
+                        <div className="border-b border-gray-200 py-3">
+                            <p className="text-gray-800 text-sm mb-1">
+                                Consumo Visa in Amazon web Services Aws.amazon.c
+                            </p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-red-500 font-bold">-$1.84</span>
+                                <span className="text-sm text-gray-500">$366.15</span>
+                            </div>
+                        </div>
+
+                        {/* Movimiento 2 */}
+                        <div className="border-b border-gray-200 py-3">
+                            <p className="text-gray-800 text-sm mb-1">
+                                Impuesto isd Amazon we
+                            </p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-red-500 font-bold">-$0.09</span>
+                                <span className="text-sm text-gray-500">$367.99</span>
+                            </div>
+                        </div>
+
+                        {/* Movimiento 3 */}
+                        <div className="py-3">
+                            <p className="text-gray-800 text-sm mb-1">
+                                Retencion Ivasd Amazon we
+                            </p>
+                            <div className="flex justify-between items-center">
+                                <span className="text-red-500 font-bold">-$0.28</span>
+                                <span className="text-sm text-gray-500">$368.08</span>
+                            </div>
+                        </div>
 
                     </div>
-                    <hr className="text-gray-400"></hr>
 
-                </form>
+                </div>
             </div>
+
         </div>
     );
 }

@@ -131,8 +131,7 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
         if result.fetchone():
             raise HTTPException(status_code=400, detail="La cédula ya está registrada")
         
-        # Establecer contraseña inicial desde el frontend (opcional, puedes mantener "123456")
-        hashed_password = pwd_context.hash("123456")  # Cambia esto si el frontend envía una contraseña
+        hashed_password = pwd_context.hash(cliente.cliente_contrasena)
         
         query = text("""
             INSERT INTO CLIENTE (
@@ -174,7 +173,7 @@ async def crear_cliente(cliente: ClienteCreate, db: Session = Depends(get_db)):
             cliente_provincia=cliente_db.cliente_provincia,
             cliente_ciudad=cliente_db.cliente_ciudad,
             cliente_fchnacimiento=cliente_db.cliente_fchnacimiento,
-            cuentas=[]  # Inicializamos cuentas vacías
+            cuentas=[]
         )
     except Exception as e:
         db.rollback()
@@ -638,7 +637,7 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
                 TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
                 TARJETA_FECHA_CADUCIDAD, TARJETA_FECHA_EMISION, TARJETA_ESTADO,
                 TARJETA_CVV, TARJETA_ESTILO, TARJETACREDITO_CUPO,
-                TARJETACREDITO_PAGO_MINIMO, TARJETA_CREDITO_PAGO_TOTAL
+                TARJETA_CREDITO_PAGO_MINIMO, TARJETA_CREDITO_PAGO_TOTAL
             ) VALUES (
                 :tarjeta_id, :cuenta_id, :nombre, :pin_seguridad, :fecha_caducidad,
                 :fecha_emision, :estado, :cvv, :estilo, :cupo, :pago_minimo, :pago_total
@@ -662,7 +661,23 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
         tarjeta_id = result.fetchone().tarjeta_id
         db.commit()
         
-        query = text("SELECT * FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
+        query = text("""
+            SELECT 
+                TARJETA_ID AS tarjeta_id,
+                CUENTA_ID AS cuenta_id,
+                TARJETA_NOMBRE AS tarjeta_nombre,
+                TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+                TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+                TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+                TARJETA_ESTADO AS tarjeta_estado,
+                TARJETA_CVV AS tarjeta_cvv,
+                TARJETA_ESTILO AS tarjeta_estilo,
+                TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+                TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+                TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+            FROM TARJETA_DE_CREDITO 
+            WHERE TARJETA_ID = :tarjeta_id
+        """)
         result = db.execute(query, {"tarjeta_id": tarjeta_id})
         tarjeta_db = result.fetchone()
         columns = result.keys()
@@ -670,11 +685,24 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de crédito: {str(e)}")
-
+    
 @app.get("/cuentas/{cuenta_id}/tarjetas-credito", response_model=List[TarjetaCreditoResponse])
 async def leer_tarjetas_credito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("""
-        SELECT tc.* FROM TARJETA_DE_CREDITO tc
+        SELECT 
+            tc.TARJETA_ID AS tarjeta_id,
+            tc.CUENTA_ID AS cuenta_id,
+            tc.TARJETA_NOMBRE AS tarjeta_nombre,
+            tc.TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+            tc.TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+            tc.TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+            tc.TARJETA_ESTADO AS tarjeta_estado,
+            tc.TARJETA_CVV AS tarjeta_cvv,
+            tc.TARJETA_ESTILO AS tarjeta_estilo,
+            tc.TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+            tc.TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+            tc.TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+        FROM TARJETA_DE_CREDITO tc
         JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
         WHERE tc.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
     """)
@@ -688,7 +716,20 @@ async def leer_tarjetas_credito_por_cuenta(cuenta_id: str, db: Session = Depends
 @app.get("/tarjetas-credito/{tarjeta_id}", response_model=TarjetaCreditoResponse)
 async def leer_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("""
-        SELECT tc.* FROM TARJETA_DE_CREDITO tc
+        SELECT 
+            tc.TARJETA_ID AS tarjeta_id,
+            tc.CUENTA_ID AS cuenta_id,
+            tc.TARJETA_NOMBRE AS tarjeta_nombre,
+            tc.TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+            tc.TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+            tc.TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+            tc.TARJETA_ESTADO AS tarjeta_estado,
+            tc.TARJETA_CVV AS tarjeta_cvv,
+            tc.TARJETA_ESTILO AS tarjeta_estilo,
+            tc.TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+            tc.TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+            tc.TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+        FROM TARJETA_DE_CREDITO tc
         JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
         WHERE tc.TARJETA_ID = :tarjeta_id AND c.CLIENTE_ID = :cliente_id
     """)
@@ -703,7 +744,20 @@ async def leer_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), c
 async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
         query = text("""
-            SELECT tc.* FROM TARJETA_DE_CREDITO tc
+            SELECT 
+                TARJETA_ID AS tarjeta_id,
+                CUENTA_ID AS cuenta_id,
+                TARJETA_NOMBRE AS tarjeta_nombre,
+                TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+                TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+                TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+                TARJETA_ESTADO AS tarjeta_estado,
+                TARJETA_CVV AS tarjeta_cvv,
+                TARJETA_ESTILO AS tarjeta_estilo,
+                TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+                TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+                TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+            FROM TARJETA_DE_CREDITO tc
             JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
             WHERE tc.TARJETA_ID = :tarjeta_id AND c.CLIENTE_ID = :cliente_id
         """)
@@ -716,20 +770,51 @@ async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpd
         if not update_data:
             raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
         
-        set_clause = ", ".join(f"{key.upper()} = :{key}" for key in update_data.keys())
+        # Mapear nombres de campos de Pydantic a nombres de columnas de la base de datos
+        column_mapping = {
+            "tarjeta_id": "TARJETA_ID",
+            "cuenta_id": "CUENTA_ID",
+            "tarjeta_nombre": "TARJETA_NOMBRE",
+            "tarjeta_pin_seguridad": "TARJETA_PIN_SEGURIDAD",
+            "tarjeta_fecha_caducidad": "TARJETA_FECHA_CADUCIDAD",
+            "tarjeta_fecha_emision": "TARJETA_FECHA_EMISION",
+            "tarjeta_estado": "TARJETA_ESTADO",
+            "tarjeta_cvv": "TARJETA_CVV",
+            "tarjeta_estilo": "TARJETA_ESTILO",
+            "tarjetacredito_cupo": "TARJETACREDITO_CUPO",
+            "tarjetacredito_pago_minimo": "TARJETA_CREDITO_PAGO_MINIMO",
+            "tarjeta_credito_pago_total": "TARJETA_CREDITO_PAGO_TOTAL"
+        }
+        set_clause = ", ".join(f"{column_mapping[key]} = :{key}" for key in update_data.keys())
         query = text(f"UPDATE TARJETA_DE_CREDITO SET {set_clause} WHERE TARJETA_ID = :tarjeta_id")
         values = {**update_data, "tarjeta_id": tarjeta_id}
         db.execute(query, values)
         db.commit()
         
-        query = text("SELECT * FROM TARJETA_DE_CREDITO WHERE TARJETA_ID = :tarjeta_id")
+        query = text("""
+            SELECT 
+                TARJETA_ID AS tarjeta_id,
+                CUENTA_ID AS cuenta_id,
+                TARJETA_NOMBRE AS tarjeta_nombre,
+                TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+                TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+                TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+                TARJETA_ESTADO AS tarjeta_estado,
+                TARJETA_CVV AS tarjeta_cvv,
+                TARJETA_ESTILO AS tarjeta_estilo,
+                TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+                TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+                TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+            FROM TARJETA_DE_CREDITO 
+            WHERE TARJETA_ID = :tarjeta_id
+        """)
         result = db.execute(query, {"tarjeta_id": tarjeta_id})
         tarjeta_db = result.fetchone()
         columns = result.keys()
         return TarjetaCreditoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de crédito: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de crédito: {str(e)}")        
 
 @app.delete("/tarjetas-credito/{tarjeta_id}")
 async def eliminar_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -799,19 +884,20 @@ async def crear_tarjeta_debito(tarjeta: TarjetaDebitoCreate, db: Session = Depen
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de débito: {str(e)}")
 
-@app.get("/cuentas/{cuenta_id}/tarjetas-debito", response_model=List[TarjetaDebitoResponse])
-async def leer_tarjetas_debito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+
+@app.get("/cuentas/{cuenta_id}/tarjetas-credito", response_model=List[TarjetaCreditoResponse])
+async def leer_tarjetas_credito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("""
-        SELECT td.* FROM TARJETA_DE_DEBITO td
-        JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
-        WHERE td.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
+        SELECT tc.* FROM TARJETA_DE_CREDITO tc
+        JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
+        WHERE tc.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
     """)
     result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
     tarjetas = result.fetchall()
     if not tarjetas:
         return []
     columns = result.keys()
-    return [TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
+    return [TarjetaCreditoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
 
 @app.get("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
 async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -826,6 +912,20 @@ async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cl
         raise HTTPException(status_code=403, detail="Tarjeta de débito no encontrada o no autorizada")
     columns = result.keys()
     return TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns})
+
+@app.get("/cuentas/{cuenta_id}/tarjetas-debito", response_model=List[TarjetaDebitoResponse], description="Obtiene todas las tarjetas de débito asociadas a una cuenta específica.")
+async def leer_tarjetas_debito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+    query = text("""
+        SELECT td.* FROM TARJETA_DE_DEBITO td
+        JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
+        WHERE td.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
+    """)
+    result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
+    tarjetas = result.fetchall()
+    if not tarjetas:
+        return []
+    columns = result.keys()
+    return [TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
 
 @app.put("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
 async def actualizar_tarjeta_debito(tarjeta_id: str, tarjeta: TarjetaDebitoUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -889,6 +989,9 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
         cuenta = result.fetchone()
         if not cuenta or cuenta.cliente_id != cliente_id:
             raise HTTPException(status_code=403, detail="Acceso no autorizado a esta cuenta")
+        
+        if deposito.monto > cuenta.cuenta_limite_trans_web:
+            raise HTTPException(status_code=400, detail="El monto excede el límite de transacciones web")
         
         if deposito.cajero_id:
             query = text("SELECT * FROM CAJERO WHERE CAJERO_ID = :cajero_id AND CAJERO_ESTADO = :estado")

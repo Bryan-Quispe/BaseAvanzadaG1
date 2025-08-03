@@ -6,9 +6,9 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional, List
 import os
-import pytz  # Añadido para manejar zonas horarias
+import pytz
 from dotenv import load_dotenv
-import uuid
+from uuid import uuid4
 from config.database import get_db
 from schemas.transaccion import (
     ClienteCreate, ClienteUpdate, ClienteResponse,
@@ -17,7 +17,8 @@ from schemas.transaccion import (
     TarjetaCreate, TarjetaUpdate, TarjetaResponse,
     TarjetaCreditoCreate, TarjetaCreditoUpdate, TarjetaCreditoResponse,
     TarjetaDebitoCreate, TarjetaDebitoUpdate, TarjetaDebitoResponse,
-    DepositoRequest, RetiroRequest, ReciboResponse
+    DepositoRequest, RetiroRequest, ReciboResponse,
+    TransaccionResponse, RetiroSinTarjetaRequest
 )
 from sqlalchemy.sql import text
 from passlib.context import CryptContext
@@ -32,7 +33,7 @@ app = FastAPI(title="Banco Pichincha API")
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://your-frontend-domain.com"],  # Reemplaza con el dominio real de tu frontend
+    allow_origins=["http://localhost:5173", "https://your-frontend-domain.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,7 +44,7 @@ SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")  # Cambiado a argon2 para evitar problemas con bcrypt
 
 # Modelos
 class Token(BaseModel):
@@ -289,7 +290,7 @@ async def crear_cuenta(cuenta: CuentaCreate, db: Session = Depends(get_db), clie
         if not result.fetchone():
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
-        cuenta_id = str(uuid.uuid4())[:10]
+        cuenta_id = str(uuid4())[:10]
         query = text("""
             INSERT INTO CUENTA (
                 CUENTA_ID, CLIENTE_ID, CUENTA_NOMBRE, CUENTA_SALDO,
@@ -401,7 +402,7 @@ async def eliminar_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente
 @app.post("/cajeros/", response_model=CajeroResponse)
 async def crear_cajero(cajero: CajeroCreate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     try:
-        cajero_id = str(uuid.uuid4())[:10]
+        cajero_id = str(uuid4())[:10]
         query = text("""
             INSERT INTO CAJERO (
                 CAJERO_ID, CAJERO_UBICACION, CAJERO_TIPO, CAJERO_ESTADO
@@ -503,7 +504,7 @@ async def crear_tarjeta(tarjeta: TarjetaCreate, db: Session = Depends(get_db), c
         if cuenta.cliente_id != cliente_id:
             raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta para esta cuenta")
         
-        tarjeta_id = str(uuid.uuid4())[:16]
+        tarjeta_id = str(uuid4())[:16]
         query = text("""
             INSERT INTO TARJETA (
                 TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
@@ -631,7 +632,7 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
         if cuenta.cliente_id != cliente_id:
             raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta de crédito para esta cuenta")
         
-        tarjeta_id = str(uuid.uuid4())[:16]
+        tarjeta_id = str(uuid4())[:16]
         query = text("""
             INSERT INTO TARJETA_DE_CREDITO (
                 TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
@@ -685,7 +686,7 @@ async def crear_tarjeta_credito(tarjeta: TarjetaCreditoCreate, db: Session = Dep
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de crédito: {str(e)}")
-    
+
 @app.get("/cuentas/{cuenta_id}/tarjetas-credito", response_model=List[TarjetaCreditoResponse])
 async def leer_tarjetas_credito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("""
@@ -745,18 +746,18 @@ async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpd
     try:
         query = text("""
             SELECT 
-                TARJETA_ID AS tarjeta_id,
-                CUENTA_ID AS cuenta_id,
-                TARJETA_NOMBRE AS tarjeta_nombre,
-                TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
-                TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
-                TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
-                TARJETA_ESTADO AS tarjeta_estado,
-                TARJETA_CVV AS tarjeta_cvv,
-                TARJETA_ESTILO AS tarjeta_estilo,
-                TARJETACREDITO_CUPO AS tarjetacredito_cupo,
-                TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
-                TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
+                tc.TARJETA_ID AS tarjeta_id,
+                tc.CUENTA_ID AS cuenta_id,
+                tc.TARJETA_NOMBRE AS tarjeta_nombre,
+                tc.TARJETA_PIN_SEGURIDAD AS tarjeta_pin_seguridad,
+                tc.TARJETA_FECHA_CADUCIDAD AS tarjeta_fecha_caducidad,
+                tc.TARJETA_FECHA_EMISION AS tarjeta_fecha_emision,
+                tc.TARJETA_ESTADO AS tarjeta_estado,
+                tc.TARJETA_CVV AS tarjeta_cvv,
+                tc.TARJETA_ESTILO AS tarjeta_estilo,
+                tc.TARJETACREDITO_CUPO AS tarjetacredito_cupo,
+                tc.TARJETA_CREDITO_PAGO_MINIMO AS tarjetacredito_pago_minimo,
+                tc.TARJETA_CREDITO_PAGO_TOTAL AS tarjeta_credito_pago_total
             FROM TARJETA_DE_CREDITO tc
             JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
             WHERE tc.TARJETA_ID = :tarjeta_id AND c.CLIENTE_ID = :cliente_id
@@ -770,7 +771,6 @@ async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpd
         if not update_data:
             raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar")
         
-        # Mapear nombres de campos de Pydantic a nombres de columnas de la base de datos
         column_mapping = {
             "tarjeta_id": "TARJETA_ID",
             "cuenta_id": "CUENTA_ID",
@@ -814,7 +814,7 @@ async def actualizar_tarjeta_credito(tarjeta_id: str, tarjeta: TarjetaCreditoUpd
         return TarjetaCreditoResponse(**{col: getattr(tarjeta_db, col) for col in columns})
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de crédito: {str(e)}")        
+        raise HTTPException(status_code=500, detail=f"Error al actualizar tarjeta de crédito: {str(e)}")
 
 @app.delete("/tarjetas-credito/{tarjeta_id}")
 async def eliminar_tarjeta_credito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -849,7 +849,7 @@ async def crear_tarjeta_debito(tarjeta: TarjetaDebitoCreate, db: Session = Depen
         if cuenta.cliente_id != cliente_id:
             raise HTTPException(status_code=403, detail="No autorizado para crear tarjeta de débito para esta cuenta")
         
-        tarjeta_id = str(uuid.uuid4())[:16]
+        tarjeta_id = str(uuid4())[:16]
         query = text("""
             INSERT INTO TARJETA_DE_DEBITO (
                 TARJETA_ID, CUENTA_ID, TARJETA_NOMBRE, TARJETA_PIN_SEGURIDAD,
@@ -884,20 +884,19 @@ async def crear_tarjeta_debito(tarjeta: TarjetaDebitoCreate, db: Session = Depen
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al crear tarjeta de débito: {str(e)}")
 
-
-@app.get("/cuentas/{cuenta_id}/tarjetas-credito", response_model=List[TarjetaCreditoResponse])
-async def leer_tarjetas_credito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
+@app.get("/cuentas/{cuenta_id}/tarjetas-debito", response_model=List[TarjetaDebitoResponse], description="Obtiene todas las tarjetas de débito asociadas a una cuenta específica.")
+async def leer_tarjetas_debito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
     query = text("""
-        SELECT tc.* FROM TARJETA_DE_CREDITO tc
-        JOIN CUENTA c ON tc.CUENTA_ID = c.CUENTA_ID
-        WHERE tc.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
+        SELECT td.* FROM TARJETA_DE_DEBITO td
+        JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
+        WHERE td.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
     """)
     result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
     tarjetas = result.fetchall()
     if not tarjetas:
         return []
     columns = result.keys()
-    return [TarjetaCreditoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
+    return [TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
 
 @app.get("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
 async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -912,20 +911,6 @@ async def leer_tarjeta_debito(tarjeta_id: str, db: Session = Depends(get_db), cl
         raise HTTPException(status_code=403, detail="Tarjeta de débito no encontrada o no autorizada")
     columns = result.keys()
     return TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns})
-
-@app.get("/cuentas/{cuenta_id}/tarjetas-debito", response_model=List[TarjetaDebitoResponse], description="Obtiene todas las tarjetas de débito asociadas a una cuenta específica.")
-async def leer_tarjetas_debito_por_cuenta(cuenta_id: str, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
-    query = text("""
-        SELECT td.* FROM TARJETA_DE_DEBITO td
-        JOIN CUENTA c ON td.CUENTA_ID = c.CUENTA_ID
-        WHERE td.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
-    """)
-    result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
-    tarjetas = result.fetchall()
-    if not tarjetas:
-        return []
-    columns = result.keys()
-    return [TarjetaDebitoResponse(**{col: getattr(tarjeta, col) for col in columns}) for tarjeta in tarjetas]
 
 @app.put("/tarjetas-debito/{tarjeta_id}", response_model=TarjetaDebitoResponse)
 async def actualizar_tarjeta_debito(tarjeta_id: str, tarjeta: TarjetaDebitoUpdate, db: Session = Depends(get_db), cliente_id: str = Depends(get_current_user)):
@@ -999,7 +984,7 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
             if not result.fetchone():
                 raise HTTPException(status_code=404, detail="Cajero no encontrado o inactivo")
         
-        transaccion_id = str(uuid.uuid4())[:8].upper()
+        transaccion_id = str(uuid4())[:8].upper()
         transaccion_costo = 0.50
         transaccion_fecha = datetime.now(pytz.UTC)
         
@@ -1075,7 +1060,7 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
         if retiro.monto > cuenta.cuenta_limite_trans_movil and retiro.usar_tarjeta:
             raise HTTPException(status_code=400, detail="El monto excede el límite de transacciones móviles")
         
-        transaccion_id = str(uuid.uuid4())[:8].upper()
+        transaccion_id = str(uuid4())[:8].upper()
         transaccion_costo = 1.00 if retiro.usar_tarjeta else 0.75
         transaccion_fecha = datetime.now(pytz.UTC)
         
@@ -1189,3 +1174,103 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en retiro: {str(e)}")
+
+# Endpoint para retiro sin tarjeta
+@app.post(
+    "/cuentas/{cuenta_id}/retiro-sin-tarjeta",
+    response_model=TransaccionResponse,
+    description="Realiza un retiro sin tarjeta desde una cuenta específica."
+)
+async def retiro_sin_tarjeta(
+    cuenta_id: str,
+    retiro: RetiroSinTarjetaRequest,
+    db: Session = Depends(get_db),
+    cliente_id: str = Depends(get_current_user)
+):
+    try:
+        # Verificar que la cuenta existe y pertenece al cliente
+        query_cuenta = text("""
+            SELECT CUENTA_ID, CUENTA_SALDO 
+            FROM CUENTA 
+            WHERE CUENTA_ID = :cuenta_id AND CLIENTE_ID = :cliente_id
+        """)
+        result_cuenta = db.execute(query_cuenta, {"cuenta_id": cuenta_id, "cliente_id": cliente_id}).fetchone()
+        if not result_cuenta:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada o no pertenece al cliente")
+
+        saldo_actual = result_cuenta.CUENTA_SALDO
+        if saldo_actual < retiro.monto:
+            raise HTTPException(status_code=400, detail="Saldo insuficiente para el retiro")
+
+        # Actualizar el saldo de la cuenta
+        nuevo_saldo = saldo_actual - retiro.monto
+        query_actualizar_saldo = text("""
+            UPDATE CUENTA 
+            SET CUENTA_SALDO = :nuevo_saldo 
+            WHERE CUENTA_ID = :cuenta_id
+        """)
+        db.execute(query_actualizar_saldo, {"nuevo_saldo": nuevo_saldo, "cuenta_id": cuenta_id})
+
+        # Registrar la transacción
+        transaccion_id = str(uuid4())[:16]
+        query_insertar_transaccion = text("""
+            INSERT INTO TRANSACCION (
+                TRANSACCION_ID, 
+                CUENTA_ID, 
+                TRANSACCION_TIPO, 
+                TRANSACCION_MONTO, 
+                TRANSACCION_FECHA, 
+                TRANSACCION_DESCRIPCION
+            )
+            VALUES (
+                :transaccion_id, 
+                :cuenta_id, 
+                :transaccion_tipo, 
+                :transaccion_monto, 
+                :transaccion_fecha, 
+                :transaccion_descripcion
+            )
+            RETURNING *
+        """)
+        result_transaccion = db.execute(query_insertar_transaccion, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": cuenta_id,
+            "transaccion_tipo": "RETIRO_SIN_TARJETA",
+            "transaccion_monto": retiro.monto,
+            "transaccion_fecha": datetime.now(pytz.UTC),
+            "transaccion_descripcion": retiro.descripcion or "Retiro sin tarjeta"
+        }).fetchone()
+        db.commit()
+
+        columns = result_transaccion._mapping.keys()
+        return TransaccionResponse(**{col: getattr(result_transaccion, col) for col in columns})
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al realizar el retiro: {str(e)}")
+
+# Endpoint para obtener transacciones por cuenta
+@app.get(
+    "/cuentas/{cuenta_id}/transacciones",
+    response_model=List[TransaccionResponse],
+    description="Obtiene todas las transacciones asociadas a una cuenta específica."
+)
+async def leer_transacciones_por_cuenta(
+    cuenta_id: str,
+    db: Session = Depends(get_db),
+    cliente_id: str = Depends(get_current_user)
+):
+    try:
+        query = text("""
+            SELECT t.* 
+            FROM TRANSACCION t
+            JOIN CUENTA c ON t.CUENTA_ID = c.CUENTA_ID
+            WHERE t.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
+        """)
+        result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
+        transacciones = result.fetchall()
+        if not transacciones:
+            return []
+        columns = result.keys()
+        return [TransaccionResponse(**{col: getattr(transaccion, col) for col in columns}) for transaccion in transacciones]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al obtener transacciones: {str(e)}")

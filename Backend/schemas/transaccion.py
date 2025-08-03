@@ -261,6 +261,22 @@ class RetiroRequest(BaseModel):
             raise ValueError('El tarjeta_id es obligatorio si usar_tarjeta es True')
         return v
 
+class RetiroSinTarjetaRequest(BaseModel):
+    cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta desde la que se realiza el retiro")
+    monto: float = Field(..., ge=0.01, le=999999.99, description="Monto a retirar")
+    descripcion: Optional[str] = Field(None, max_length=100, description="Descripción opcional del retiro")
+    celular_beneficiario: str = Field(..., min_length=10, max_length=10, description="Número de celular del beneficiario (10 dígitos)")
+
+    @validator('celular_beneficiario')
+    def validate_celular_beneficiario(cls, v):
+        if not v.isdigit() or len(v) != 10 or not v.startswith('09'):
+            raise ValueError('El celular del beneficiario debe ser un número de 10 dígitos que comience con 09')
+        return v
+
+class RetiroSinTarjetaResponse(BaseModel):
+    transaccion_id: str = Field(..., min_length=1, max_length=8, description="ID de la transacción")
+    codigo_verificacion: str = Field(..., min_length=4, max_length=4, description="Código de verificación de 4 dígitos")
+
 class ReciboResponse(BaseModel):
     transaccion_id: str = Field(..., min_length=1, max_length=8, description="ID de la transacción")
     cajero_id: str = Field(..., min_length=1, max_length=10, description="ID del cajero")
@@ -270,6 +286,14 @@ class ReciboResponse(BaseModel):
     @validator('transaccion_fecha')
     def validate_transaccion_fecha(cls, v):
         return v if v.tzinfo else v.replace(tzinfo=pytz.UTC)
+
+class TransaccionResponse(BaseModel):
+    transaccion_id: str = Field(..., min_length=1, max_length=16, description="ID único de la transacción")
+    cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta asociada")
+    transaccion_tipo: str = Field(..., min_length=1, max_length=32, description="Tipo de transacción (DEPOSITO, RETIRO, RETIRO_SIN_TARJETA, etc.)")
+    transaccion_monto: float = Field(..., ge=0, description="Monto de la transacción")
+    transaccion_fecha: datetime = Field(..., description="Fecha y hora de la transacción")
+    transaccion_descripcion: Optional[str] = Field(None, max_length=100, description="Descripción de la transacción")
 
     class Config:
         from_attributes = True

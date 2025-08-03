@@ -27,10 +27,9 @@ function DropdownMenu() {
   }, []);
 
   useEffect(() => {
-    console.log(clienteId,token);
       const fetchAccounts = async () => {
         const data = await getAccount(clienteId, token);
-        setCuenta(data);
+        setUsuario(data);
       };
   
       fetchAccounts();
@@ -44,7 +43,7 @@ function DropdownMenu() {
     };
   return (
     <div className="flex items-center space-x-3 relative">
-      <p>{usuario.cliente_nombres}{usuario.cliente_apellidos}</p>
+      <p>{usuario.cliente_nombres} {usuario.cliente_apellidos}</p>
 
       <div className="relative">
         <button

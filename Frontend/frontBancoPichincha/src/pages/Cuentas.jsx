@@ -8,7 +8,7 @@ function Cuentas() {
   const [ApellidoUsuario, setApellido] = useState("");
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800">
-      <Header NombreUsuario={NombreUsuario} ApellidoUsuario={ApellidoUsuario} />
+      <Header />
       <div className="flex">
         <Sidebar /> 
         <MainContent/>

@@ -22,3 +22,8 @@ export const getAccounts = async (cliente_id, token) => {
     return [];
   }
 };
+
+export const maskAccountId = (id) =>{
+  if (!id) return "";
+  return "*".repeat(id.length - 4) + id.slice(-4);
+}

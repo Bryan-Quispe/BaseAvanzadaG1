@@ -15,17 +15,19 @@ export const AuthProvider = ({ children }) => {
 
   const login = (newToken, newClienteId) => {
     sessionStorage.setItem("token", newToken); 
+    sessionStorage.setItem("clienteId", newClienteId);
     setToken(newToken);
     setClienteId(newClienteId);
   };
 
   const logout = () => {
     sessionStorage.removeItem("token");
+    sessionStorage.removeItemItem("clienteId");
     setToken(null);
   };
 
   return (
-    <AuthContext.Provider value={{ token, login, logout }}>
+    <AuthContext.Provider value={{ token, login, logout, clienteId }}>
       {children}
     </AuthContext.Provider>
   );

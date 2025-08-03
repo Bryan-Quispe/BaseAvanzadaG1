@@ -12,7 +12,7 @@ import AccountDetails from './pages/AccountDetails.jsx';
 
 function App() {
   const { token } = useAuth();
-
+  
   const isAuthenticated = token !== null;
   const isRegisterSuccesfull = sessionStorage.getItem("registerSuccesfull");
 

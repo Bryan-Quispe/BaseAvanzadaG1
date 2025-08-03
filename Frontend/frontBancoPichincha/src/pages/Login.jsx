@@ -44,8 +44,8 @@ function Login() {
       const user = await userResponse.json();
 
       sessionStorage.setItem("user", JSON.stringify(user));
-
-      login(data.access_token);
+      console.log(user)
+      login(data.access_token,user.cliente_id);
 
     } catch (error) {
       console.error("Login failed:", error);

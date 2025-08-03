@@ -4,6 +4,7 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
+  const [clienteId, setClienteId] = useState(null); 
 
   useEffect(() => {
     const savedToken = sessionStorage.getItem("token");
@@ -12,9 +13,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = (newToken) => {
+  const login = (newToken, newClienteId) => {
     sessionStorage.setItem("token", newToken); 
     setToken(newToken);
+    setClienteId(newClienteId);
   };
 
   const logout = () => {

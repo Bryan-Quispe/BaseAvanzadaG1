@@ -1,19 +1,21 @@
-
 import AccountCard from "./CuentaCards";
-import { useState,useEffect } from "react";
-import { useAuth} from '../../context/AuthContext'
+import AccountModal from "./CuentaModal";
+import { useState, useEffect } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { getAccounts } from "../../hooks/CuentasHooks";
-function AccountSlider() {
 
-    const [Cuentas,setCuentas]= useState([]);
-    const {clienteId,token} = useAuth()
-    const [loading, setLoading] = useState(true);
-     useEffect(() => {
+function AccountSlider() {
+  const [Cuentas, setCuentas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedAccount, setSelectedAccount] = useState(null); 
+  const { clienteId, token } = useAuth();
+
+  useEffect(() => {
     const fetchAccounts = async () => {
-      setLoading(true); 
+      setLoading(true);
       const data = await getAccounts(clienteId, token);
       setCuentas(Array.isArray(data) ? [...data] : []);
-      setLoading(false); 
+      setLoading(false);
     };
 
     if (clienteId && token) fetchAccounts();
@@ -45,19 +47,21 @@ function AccountSlider() {
         <span>Cargando Cuentas...</span>
       </div>
     );
-  }; 
+  }
 
   return (
     <div className="w-full overflow-x-auto scrollbar-hide">
       <div className="flex space-x-4 p-4">
         {Cuentas.length > 0 ? (
           Cuentas.map((cuenta) => (
-            <AccountCard key={cuenta.cuenta_id} cuenta={cuenta} />
+            <AccountCard key={cuenta.cuenta_id} cuenta={cuenta} onClick={setSelectedAccount} />
           ))
         ) : (
           <p className="text-gray-500">No tienes cuentas registradas.</p>
         )}
       </div>
+
+      <AccountModal cuenta={selectedAccount} onClose={() => setSelectedAccount(null)} />
     </div>
   );
 }

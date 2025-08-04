@@ -15,8 +15,8 @@ export const getAccounts = async (cliente_id, token) => {
     if (!accountsResponse.ok) {
       throw new Error("No se pudo obtener las cuentas");
     }
-
     return await accountsResponse.json();
+   
   } catch (error) {
     console.error("Fallo la obtención de cuentas y tarjetas:", error);
     return [];

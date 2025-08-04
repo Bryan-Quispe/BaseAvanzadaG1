@@ -1,10 +1,15 @@
 
 import { useState,useEffect } from "react";
 import AccountSlider from './CuentaCarusel';
+import ActionsContent from "../Acciones/AccionesContent";
 function CuentasContent(){
 
     return(
-         <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h2 className="text-2xl font-bold text-blue-900 mb-4">
+        Acciones
+      </h2>
+        <ActionsContent/>
       <h2 className="text-2xl font-bold text-blue-900 mb-4">
         Mis Cuentas
       </h2>

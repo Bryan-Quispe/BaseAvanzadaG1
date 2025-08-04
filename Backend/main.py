@@ -44,7 +44,7 @@ SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")  # Cambiado a argon2 para evitar problemas con bcrypt
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # Cambiado a bcrypt para compatibilidad con hashes existentes
 
 # Modelos
 class Token(BaseModel):

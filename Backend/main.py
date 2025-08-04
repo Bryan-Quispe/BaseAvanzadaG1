@@ -17,12 +17,20 @@ from schemas.transaccion import (
     TarjetaCreate, TarjetaUpdate, TarjetaResponse,
     TarjetaCreditoCreate, TarjetaCreditoUpdate, TarjetaCreditoResponse,
     TarjetaDebitoCreate, TarjetaDebitoUpdate, TarjetaDebitoResponse,
-    DepositoRequest, RetiroRequest, ReciboResponse,
-    TransaccionResponse, RetiroSinTarjetaRequest
+    DepositoRequest, RetiroRequest, ReciboResponse, TransaccionResponse,
+    RetiroSinTarjetaRequest, RetiroSinTarjetaResponse
 )
 from sqlalchemy.sql import text
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+from decimal import Decimal
+import random
+import string
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
 load_dotenv()
@@ -44,7 +52,7 @@ SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")  # Cambiado a bcrypt para compatibilidad con hashes existentes
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Modelos
 class Token(BaseModel):
@@ -985,19 +993,22 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
                 raise HTTPException(status_code=404, detail="Cajero no encontrado o inactivo")
         
         transaccion_id = str(uuid4())[:8].upper()
-        transaccion_costo = 0.50
+        transaccion_costo = Decimal("0.50")
         transaccion_fecha = datetime.now(pytz.UTC)
         
         query = text("""
             INSERT INTO TRANSACCION (
-                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_TIPO, TRANSACCION_MONTO,
+                TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
             ) VALUES (
-                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo
+                :transaccion_id, :cuenta_id, :tipo, :monto, :costo, :fecha, :recibo
             ) RETURNING TRANSACCION_ID
         """)
         result = db.execute(query, {
             "transaccion_id": transaccion_id,
             "cuenta_id": deposito.cuenta_id,
+            "tipo": "DEPOSITO",
+            "monto": deposito.monto,
             "costo": transaccion_costo,
             "fecha": transaccion_fecha,
             "recibo": 1 if deposito.generar_recibo else None
@@ -1024,7 +1035,7 @@ async def deposito(deposito: DepositoRequest, db: Session = Depends(get_db), cli
         
         recibo = None
         if deposito.generar_recibo and deposito.cajero_id:
-            recibo_costo = 0.25
+            recibo_costo = Decimal("0.25")
             query = text("INSERT INTO RECIBO (TRANSACCION_ID, CAJERO_ID, RECIBO_COSTO) VALUES (:transaccion_id, :cajero_id, :costo)")
             db.execute(query, {"transaccion_id": transaccion_id, "cajero_id": deposito.cajero_id, "costo": recibo_costo})
             recibo = ReciboResponse(
@@ -1061,19 +1072,22 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
             raise HTTPException(status_code=400, detail="El monto excede el límite de transacciones móviles")
         
         transaccion_id = str(uuid4())[:8].upper()
-        transaccion_costo = 1.00 if retiro.usar_tarjeta else 0.75
+        transaccion_costo = Decimal("1.00") if retiro.usar_tarjeta else Decimal("0.75")
         transaccion_fecha = datetime.now(pytz.UTC)
         
         query = text("""
             INSERT INTO TRANSACCION (
-                TRANSACCION_ID, CUENTA_ID, TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
+                TRANSACCION_ID, CUENTA_ID, TRANSACCION_TIPO, TRANSACCION_MONTO,
+                TRANSACCION_COSTO, TRANSACCION_FECHA, TRANSACCION_RECIBO
             ) VALUES (
-                :transaccion_id, :cuenta_id, :costo, :fecha, :recibo
+                :transaccion_id, :cuenta_id, :tipo, :monto, :costo, :fecha, :recibo
             ) RETURNING TRANSACCION_ID
         """)
         result = db.execute(query, {
             "transaccion_id": transaccion_id,
             "cuenta_id": retiro.cuenta_id,
+            "tipo": "RETIRO",
+            "monto": retiro.monto,
             "costo": transaccion_costo,
             "fecha": transaccion_fecha,
             "recibo": 1 if retiro.generar_recibo else None
@@ -1095,7 +1109,7 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
             "fecha": transaccion_fecha,
             "recibo": 1 if retiro.generar_recibo else None,
             "monto": retiro.monto,
-            "monto_max": 1000
+            "monto_max": Decimal("1000")
         })
         
         if retiro.usar_tarjeta and retiro.tarjeta_id:
@@ -1121,12 +1135,12 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
                 "fecha": transaccion_fecha,
                 "recibo": 1 if retiro.generar_recibo else None,
                 "monto": retiro.monto,
-                "monto_max": 1000,
+                "monto_max": Decimal("1000"),
                 "tarjeta": retiro.tarjeta_id,
                 "aid": "A0000000041010",
                 "p22": "123",
                 "p38": "123456",
-                "costo_inter": 0.10
+                "costo_inter": Decimal("0.10")
             })
         else:
             query = text("""
@@ -1147,7 +1161,7 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
                 "fecha": transaccion_fecha,
                 "recibo": 1 if retiro.generar_recibo else None,
                 "monto": retiro.monto,
-                "monto_max": 1000,
+                "monto_max": Decimal("1000"),
                 "celular_beneficiario": "0999999999",
                 "clave": "1234",
                 "duracion": 24,
@@ -1159,7 +1173,7 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
         
         recibo = None
         if retiro.generar_recibo and retiro.cajero_id:
-            recibo_costo = 0.25
+            recibo_costo = Decimal("0.25")
             query = text("INSERT INTO RECIBO (TRANSACCION_ID, CAJERO_ID, RECIBO_COSTO) VALUES (:transaccion_id, :cajero_id, :costo)")
             db.execute(query, {"transaccion_id": transaccion_id, "cajero_id": retiro.cajero_id, "costo": recibo_costo})
             recibo = ReciboResponse(
@@ -1175,79 +1189,6 @@ async def retiro(retiro: RetiroRequest, db: Session = Depends(get_db), cliente_i
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error en retiro: {str(e)}")
 
-# Endpoint para retiro sin tarjeta
-@app.post(
-    "/cuentas/{cuenta_id}/retiro-sin-tarjeta",
-    response_model=TransaccionResponse,
-    description="Realiza un retiro sin tarjeta desde una cuenta específica."
-)
-async def retiro_sin_tarjeta(
-    cuenta_id: str,
-    retiro: RetiroSinTarjetaRequest,
-    db: Session = Depends(get_db),
-    cliente_id: str = Depends(get_current_user)
-):
-    try:
-        # Verificar que la cuenta existe y pertenece al cliente
-        query_cuenta = text("""
-            SELECT CUENTA_ID, CUENTA_SALDO 
-            FROM CUENTA 
-            WHERE CUENTA_ID = :cuenta_id AND CLIENTE_ID = :cliente_id
-        """)
-        result_cuenta = db.execute(query_cuenta, {"cuenta_id": cuenta_id, "cliente_id": cliente_id}).fetchone()
-        if not result_cuenta:
-            raise HTTPException(status_code=404, detail="Cuenta no encontrada o no pertenece al cliente")
-
-        saldo_actual = result_cuenta.CUENTA_SALDO
-        if saldo_actual < retiro.monto:
-            raise HTTPException(status_code=400, detail="Saldo insuficiente para el retiro")
-
-        # Actualizar el saldo de la cuenta
-        nuevo_saldo = saldo_actual - retiro.monto
-        query_actualizar_saldo = text("""
-            UPDATE CUENTA 
-            SET CUENTA_SALDO = :nuevo_saldo 
-            WHERE CUENTA_ID = :cuenta_id
-        """)
-        db.execute(query_actualizar_saldo, {"nuevo_saldo": nuevo_saldo, "cuenta_id": cuenta_id})
-
-        # Registrar la transacción
-        transaccion_id = str(uuid4())[:16]
-        query_insertar_transaccion = text("""
-            INSERT INTO TRANSACCION (
-                TRANSACCION_ID, 
-                CUENTA_ID, 
-                TRANSACCION_TIPO, 
-                TRANSACCION_MONTO, 
-                TRANSACCION_FECHA, 
-                TRANSACCION_DESCRIPCION
-            )
-            VALUES (
-                :transaccion_id, 
-                :cuenta_id, 
-                :transaccion_tipo, 
-                :transaccion_monto, 
-                :transaccion_fecha, 
-                :transaccion_descripcion
-            )
-            RETURNING *
-        """)
-        result_transaccion = db.execute(query_insertar_transaccion, {
-            "transaccion_id": transaccion_id,
-            "cuenta_id": cuenta_id,
-            "transaccion_tipo": "RETIRO_SIN_TARJETA",
-            "transaccion_monto": retiro.monto,
-            "transaccion_fecha": datetime.now(pytz.UTC),
-            "transaccion_descripcion": retiro.descripcion or "Retiro sin tarjeta"
-        }).fetchone()
-        db.commit()
-
-        columns = result_transaccion._mapping.keys()
-        return TransaccionResponse(**{col: getattr(result_transaccion, col) for col in columns})
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al realizar el retiro: {str(e)}")
-
 # Endpoint para obtener transacciones por cuenta
 @app.get(
     "/cuentas/{cuenta_id}/transacciones",
@@ -1260,17 +1201,201 @@ async def leer_transacciones_por_cuenta(
     cliente_id: str = Depends(get_current_user)
 ):
     try:
+        # Verificar que la cuenta pertenece al cliente
         query = text("""
-            SELECT t.* 
-            FROM TRANSACCION t
-            JOIN CUENTA c ON t.CUENTA_ID = c.CUENTA_ID
-            WHERE t.CUENTA_ID = :cuenta_id AND c.CLIENTE_ID = :cliente_id
+            SELECT CUENTA_ID AS cuenta_id, CLIENTE_ID AS cliente_id 
+            FROM CUENTA 
+            WHERE CUENTA_ID = :cuenta_id AND CLIENTE_ID = :cliente_id
         """)
         result = db.execute(query, {"cuenta_id": cuenta_id, "cliente_id": cliente_id})
+        cuenta = result.fetchone()
+        if not cuenta:
+            raise HTTPException(status_code=403, detail="Cuenta no encontrada o no autorizada")
+
+        # Obtener transacciones
+        query = text("""
+    SELECT 
+        TRANSACCION_ID AS transaccion_id,
+        CUENTA_ID AS cuenta_id,
+        TIPO AS transaccion_tipo,
+        transaccion_monto AS transaccion_monto,
+        TRANSACCION_COSTO AS transaccion_costo,
+        TRANSACCION_FECHA AS transaccion_fecha,
+        TRANSACCION_DESCRIPCION AS transaccion_descripcion,
+        TRANSACCION_RECIBO AS transaccion_recibo
+    FROM TRANSACCION 
+    WHERE CUENTA_ID = :cuenta_id
+""")
+        result = db.execute(query, {"cuenta_id": cuenta_id})
         transacciones = result.fetchall()
         if not transacciones:
             return []
+        
         columns = result.keys()
         return [TransaccionResponse(**{col: getattr(transaccion, col) for col in columns}) for transaccion in transacciones]
     except Exception as e:
+        logger.error(f"Error in leer_transacciones_por_cuenta: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener transacciones: {str(e)}")
+    
+@app.post(
+    "/cuentas/{cuenta_id}/retiro-sin-tarjeta",
+    response_model=RetiroSinTarjetaResponse,
+    description="Realiza un retiro sin tarjeta desde una cuenta específica."
+)
+async def retiro_sin_tarjeta(
+    cuenta_id: str,
+    retiro: RetiroSinTarjetaRequest,
+    db: Session = Depends(get_db),
+    cliente_id: str = Depends(get_current_user)
+):
+    try:
+        # Verificar que la cuenta existe y pertenece al cliente
+        query_cuenta = text("""
+            SELECT CUENTA_ID AS cuenta_id, cuenta_saldo AS cuenta_saldo, CUENTA_LIMITE_TRANS_MOVIL AS cuenta_limite_trans_movil 
+            FROM CUENTA 
+            WHERE CUENTA_ID = :cuenta_id AND CLIENTE_ID = :cliente_id AND CUENTA_ESTADO = :estado
+        """)
+        result_cuenta = db.execute(query_cuenta, {"cuenta_id": cuenta_id, "cliente_id": cliente_id, "estado": "ACTIVA"}).fetchone()
+        logger.info(f"Query result for cuenta_id {cuenta_id}: {result_cuenta}")
+        if not result_cuenta:
+            raise HTTPException(status_code=404, detail="Cuenta no encontrada, no pertenece al cliente o no está activa")
+
+        saldo_actual = result_cuenta.cuenta_saldo
+        limite_movil = result_cuenta.cuenta_limite_trans_movil
+        monto = Decimal(str(retiro.monto))
+        if saldo_actual < monto:
+            raise HTTPException(status_code=400, detail="Saldo insuficiente para el retiro")
+        if monto > limite_movil:
+            raise HTTPException(status_code=400, detail="El monto excede el límite de transacciones móviles")
+
+        # Generar ID de transacción y código de verificación
+        transaccion_id = str(uuid4())[:8]
+        codigo_verificacion = ''.join(random.choices(string.digits, k=4))
+
+        # Actualizar el saldo de la cuenta
+        nuevo_saldo = saldo_actual - monto
+        query_actualizar_saldo = text("""
+            UPDATE CUENTA 
+            SET cuenta_saldo = :nuevo_saldo 
+            WHERE CUENTA_ID = :cuenta_id
+        """)
+        db.execute(query_actualizar_saldo, {"nuevo_saldo": nuevo_saldo, "cuenta_id": cuenta_id})
+
+        # Registrar la transacción en TRANSACCION
+        transaccion_costo = Decimal("0.75")
+        transaccion_fecha = datetime.now(pytz.UTC)
+        query_insertar_transaccion = text("""
+            INSERT INTO TRANSACCION (
+                TRANSACCION_ID, 
+                CUENTA_ID, 
+                TIPO, 
+                TRANSACCION_MONTO, 
+                TRANSACCION_COSTO, 
+                TRANSACCION_FECHA, 
+                TRANSACCION_DESCRIPCION,
+                TRANSACCION_RECIBO
+            )
+            VALUES (
+                :transaccion_id, 
+                :cuenta_id, 
+                :transaccion_tipo, 
+                :transaccion_monto, 
+                :transaccion_costo, 
+                :transaccion_fecha, 
+                :transaccion_descripcion,
+                :transaccion_recibo
+            )
+            RETURNING *
+        """)
+        result_transaccion = db.execute(query_insertar_transaccion, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": cuenta_id,
+            "transaccion_tipo": "RETIRO_SIN_TARJETA",
+            "transaccion_monto": monto,
+            "transaccion_costo": transaccion_costo,
+            "transaccion_fecha": transaccion_fecha,
+            "transaccion_descripcion": retiro.descripcion or "Retiro sin tarjeta",
+            "transaccion_recibo": None
+        }).fetchone()
+
+        # Registrar en RETIRO
+        query_insertar_retiro = text("""
+            INSERT INTO RETIRO (
+                TRANSACCION_ID, 
+                CUENTA_ID, 
+                TRANSACCION_COSTO, 
+                TRANSACCION_FECHA, 
+                TRANSACCION_RECIBO,
+                RETIRO_MONTO,
+                RETIRO_MONTO_MAX
+            ) VALUES (
+                :transaccion_id, 
+                :cuenta_id, 
+                :transaccion_costo, 
+                :transaccion_fecha, 
+                :transaccion_recibo,
+                :retiro_monto,
+                :retiro_monto_max
+            )
+        """)
+        db.execute(query_insertar_retiro, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": cuenta_id,
+            "transaccion_costo": transaccion_costo,
+            "transaccion_fecha": transaccion_fecha,
+            "transaccion_recibo": None,
+            "retiro_monto": int(monto),  # Convertir a int según el esquema
+            "retiro_monto_max": 1000
+        })
+
+        # Registrar en RETIRO_SIN_TARJETA
+        query_retiro_sin_tarjeta = text("""
+            INSERT INTO RETIRO_SIN_TARJETA (
+                TRANSACCION_ID, 
+                CUENTA_ID, 
+                TRANSACCION_COSTO, 
+                TRANSACCION_FECHA, 
+                TRANSACCION_RECIBO,
+                RETIRO_MONTO,
+                RETIRO_MONTO_MAX,
+                RETIROST_CELULAR_BENEFICIARIO,
+                RETIROST_CLAVE,
+                RETIROST_DURACION,
+                RETIROST_MAXIMO_RETIROS
+            ) VALUES (
+                :transaccion_id, 
+                :cuenta_id, 
+                :transaccion_costo, 
+                :transaccion_fecha, 
+                :transaccion_recibo,
+                :retiro_monto,
+                :retiro_monto_max,
+                :celular_beneficiario,
+                :retirost_clave,
+                :duracion,
+                :maximo_retiros
+            )
+        """)
+        db.execute(query_retiro_sin_tarjeta, {
+            "transaccion_id": transaccion_id,
+            "cuenta_id": cuenta_id,
+            "transaccion_costo": transaccion_costo,
+            "transaccion_fecha": transaccion_fecha,
+            "transaccion_recibo": None,
+            "retiro_monto": int(monto),
+            "retiro_monto_max": 1000,
+            "celular_beneficiario": retiro.celular_beneficiario,
+            "retirost_clave": codigo_verificacion,
+            "duracion": 24,
+            "maximo_retiros": 1
+        })
+
+        db.commit()
+        return RetiroSinTarjetaResponse(
+            transaccion_id=transaccion_id,
+            codigo_verificacion=codigo_verificacion
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error in retiro_sin_tarjeta: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al realizar el retiro: {str(e)}")

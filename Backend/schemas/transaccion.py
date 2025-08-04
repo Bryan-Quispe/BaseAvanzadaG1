@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Optional, List
 from datetime import datetime, date
+from decimal import Decimal
 import re
 import pytz
 
@@ -64,11 +65,11 @@ class ClienteResponse(ClienteBase):
 # Esquemas para Cuenta
 class CuentaBase(BaseModel):
     cuenta_nombre: str = Field(..., min_length=1, max_length=64, description="Nombre de la cuenta")
-    cuenta_saldo: float = Field(..., ge=0, description="Saldo de la cuenta (no negativo)")
+    cuenta_saldo: Decimal = Field(..., ge=0, decimal_places=2, description="Saldo de la cuenta (no negativo)")
     cuenta_apertura: date = Field(..., description="Fecha de apertura")
     cuenta_estado: str = Field(..., min_length=1, max_length=32, description="Estado de la cuenta (ACTIVA/INACTIVA)")
-    cuenta_limite_trans_web: float = Field(..., ge=0, description="Límite de transacciones web")
-    cuenta_limite_trans_movil: float = Field(..., ge=0, description="Límite de transacciones móviles")
+    cuenta_limite_trans_web: Decimal = Field(..., ge=0, decimal_places=2, description="Límite de transacciones web")
+    cuenta_limite_trans_movil: Decimal = Field(..., ge=0, decimal_places=2, description="Límite de transacciones móviles")
 
     @validator('cuenta_estado')
     def validate_estado(cls, v):
@@ -87,10 +88,10 @@ class CuentaCreate(CuentaBase):
 
 class CuentaUpdate(CuentaBase):
     cuenta_nombre: Optional[str] = Field(None, min_length=1, max_length=64)
-    cuenta_saldo: Optional[float] = Field(None, ge=0)
+    cuenta_saldo: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
     cuenta_estado: Optional[str] = Field(None, min_length=1, max_length=32)
-    cuenta_limite_trans_web: Optional[float] = Field(None, ge=0)
-    cuenta_limite_trans_movil: Optional[float] = Field(None, ge=0)
+    cuenta_limite_trans_web: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
+    cuenta_limite_trans_movil: Optional[Decimal] = Field(None, ge=0, decimal_places=2)
 
 class CuentaResponse(CuentaBase):
     cuenta_id: str
@@ -101,13 +102,13 @@ class CuentaResponse(CuentaBase):
 
 # Esquemas para Cuenta Corriente (para manejar sobregiro)
 class CuentaCorrienteCreate(CuentaCreate):
-    cuentatrans_sobregiro: Optional[float] = Field(None, ge=0, le=999.99, description="Límite de sobregiro (máximo 999.99)")
+    cuentatrans_sobregiro: Optional[Decimal] = Field(None, ge=0, le=999.99, decimal_places=2, description="Límite de sobregiro (máximo 999.99)")
 
 class CuentaCorrienteUpdate(CuentaUpdate):
-    cuentatrans_sobregiro: Optional[float] = Field(None, ge=0, le=999.99, description="Límite de sobregiro (máximo 999.99)")
+    cuentatrans_sobregiro: Optional[Decimal] = Field(None, ge=0, le=999.99, decimal_places=2, description="Límite de sobregiro (máximo 999.99)")
 
 class CuentaCorrienteResponse(CuentaResponse):
-    cuentatrans_sobregiro: Optional[float] = None
+    cuentatrans_sobregiro: Optional[Decimal] = None
 
 # Esquemas para Cajero
 class CajeroBase(BaseModel):
@@ -194,9 +195,9 @@ class TarjetaResponse(TarjetaBase):
 
 # Esquemas para Tarjeta de Crédito
 class TarjetaCreditoCreate(TarjetaBase):
-    tarjetacredito_cupo: float = Field(..., ge=0, le=999999.99, description="Cupo de la tarjeta de crédito (máximo 999999.99)")
-    tarjetacredito_pago_minimo: float = Field(..., ge=0, le=999999.99, description="Pago mínimo (máximo 999999.99)")
-    tarjeta_credito_pago_total: float = Field(..., ge=0, le=999999.99, description="Pago total (máximo 999999.99)")
+    tarjetacredito_cupo: Decimal = Field(..., ge=0, le=999999.99, decimal_places=2, description="Cupo de la tarjeta de crédito (máximo 999999.99)")
+    tarjetacredito_pago_minimo: Decimal = Field(..., ge=0, le=999999.99, decimal_places=2, description="Pago mínimo (máximo 999999.99)")
+    tarjeta_credito_pago_total: Decimal = Field(..., ge=0, le=999999.99, decimal_places=2, description="Pago total (máximo 999999.99)")
 
 class TarjetaCreditoUpdate(TarjetaBase):
     cuenta_id: Optional[str] = Field(None, min_length=1, max_length=10)
@@ -207,15 +208,15 @@ class TarjetaCreditoUpdate(TarjetaBase):
     tarjeta_estado: Optional[str] = Field(None, min_length=1, max_length=16)
     tarjeta_cvv: Optional[str] = Field(None, min_length=3, max_length=3)
     tarjeta_estilo: Optional[str] = Field(None, min_length=1, max_length=64)
-    tarjetacredito_cupo: Optional[float] = Field(None, ge=0, le=999999.99)
-    tarjetacredito_pago_minimo: Optional[float] = Field(None, ge=0, le=999999.99)
-    tarjeta_credito_pago_total: Optional[float] = Field(None, ge=0, le=999999.99)
+    tarjetacredito_cupo: Optional[Decimal] = Field(None, ge=0, le=999999.99, decimal_places=2)
+    tarjetacredito_pago_minimo: Optional[Decimal] = Field(None, ge=0, le=999999.99, decimal_places=2)
+    tarjeta_credito_pago_total: Optional[Decimal] = Field(None, ge=0, le=999999.99, decimal_places=2)
 
 class TarjetaCreditoResponse(TarjetaBase):
     tarjeta_id: str = Field(..., min_length=1, max_length=16)
-    tarjetacredito_cupo: float
-    tarjetacredito_pago_minimo: Optional[float] = None
-    tarjeta_credito_pago_total: Optional[float] = None
+    tarjetacredito_cupo: Decimal
+    tarjetacredito_pago_minimo: Optional[Decimal] = None
+    tarjeta_credito_pago_total: Optional[Decimal] = None
 
     class Config:
         from_attributes = True
@@ -243,13 +244,13 @@ class TarjetaDebitoResponse(TarjetaBase):
 # Esquemas para Transacciones
 class DepositoRequest(BaseModel):
     cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta")
-    monto: float = Field(..., gt=0, le=999999.99, description="Monto del depósito (positivo, máximo 999999.99)")
+    monto: Decimal = Field(..., gt=0, le=999999.99, decimal_places=2, description="Monto del depósito (positivo, máximo 999999.99)")
     generar_recibo: bool = Field(..., description="Generar recibo")
     cajero_id: Optional[str] = Field(None, min_length=1, max_length=10, description="ID del cajero")
 
 class RetiroRequest(BaseModel):
     cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta")
-    monto: float = Field(..., gt=0, le=1000, description="Monto del retiro (positivo, máximo 1000)")
+    monto: Decimal = Field(..., gt=0, le=1000, decimal_places=2, description="Monto del retiro (positivo, máximo 1000)")
     generar_recibo: bool = Field(..., description="Generar recibo")
     cajero_id: str = Field(..., min_length=1, max_length=10, description="ID del cajero")
     usar_tarjeta: bool = Field(..., description="Usar tarjeta")
@@ -263,7 +264,7 @@ class RetiroRequest(BaseModel):
 
 class RetiroSinTarjetaRequest(BaseModel):
     cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta desde la que se realiza el retiro")
-    monto: float = Field(..., ge=0.01, le=999999.99, description="Monto a retirar")
+    monto: Decimal = Field(..., ge=0.01, le=999999.99, decimal_places=2, description="Monto a retirar")
     descripcion: Optional[str] = Field(None, max_length=100, description="Descripción opcional del retiro")
     celular_beneficiario: str = Field(..., min_length=10, max_length=10, description="Número de celular del beneficiario (10 dígitos)")
 
@@ -280,7 +281,7 @@ class RetiroSinTarjetaResponse(BaseModel):
 class ReciboResponse(BaseModel):
     transaccion_id: str = Field(..., min_length=1, max_length=8, description="ID de la transacción")
     cajero_id: str = Field(..., min_length=1, max_length=10, description="ID del cajero")
-    recibo_costo: float = Field(..., ge=0, le=999.99, description="Costo del recibo (máximo 999.99)")
+    recibo_costo: Decimal = Field(..., ge=0, le=999.99, decimal_places=2, description="Costo del recibo (máximo 999.99)")
     transaccion_fecha: datetime = Field(..., description="Fecha de la transacción")
 
     @validator('transaccion_fecha')
@@ -291,9 +292,11 @@ class TransaccionResponse(BaseModel):
     transaccion_id: str = Field(..., min_length=1, max_length=16, description="ID único de la transacción")
     cuenta_id: str = Field(..., min_length=1, max_length=10, description="ID de la cuenta asociada")
     transaccion_tipo: str = Field(..., min_length=1, max_length=32, description="Tipo de transacción (DEPOSITO, RETIRO, RETIRO_SIN_TARJETA, etc.)")
-    transaccion_monto: float = Field(..., ge=0, description="Monto de la transacción")
+    transaccion_monto: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Monto de la transacción")
+    transaccion_costo: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Costo de la transacción")
     transaccion_fecha: datetime = Field(..., description="Fecha y hora de la transacción")
     transaccion_descripcion: Optional[str] = Field(None, max_length=100, description="Descripción de la transacción")
+    transaccion_recibo: Optional[int] = Field(None, description="ID del recibo asociado, si existe")
 
     class Config:
         from_attributes = True

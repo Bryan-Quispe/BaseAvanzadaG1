@@ -64,7 +64,7 @@ export default function RetiroForm({ onSubmit }) {
       {/* Botón generar */}
       <button
         onClick={handleSubmit}
-        className="mt-4 px-4 py-2 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition"
+        className="mt-4 px-4 py-2 rounded-lg font-bold text-black bg-yellow-400 hover:bg-yellow-600 transition"
       >
         Generar Retiro
       </button>

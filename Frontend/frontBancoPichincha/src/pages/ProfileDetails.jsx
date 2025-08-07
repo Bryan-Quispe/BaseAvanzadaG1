@@ -6,6 +6,12 @@ export default function ProfileDetails() {
   const [cliente, setCliente] = useState({});
   const [editingField, setEditingField] = useState(null);
   const [tempValue, setTempValue] = useState("");
+  const [currentPass, setCurrentPass] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [repeatNewPass, setRepeatNewPass] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const user = JSON.parse(sessionStorage.getItem('user')) || {
     cliente_nombre: 'Usuario',
@@ -52,7 +58,7 @@ export default function ProfileDetails() {
     setLoading(true);
     try {
       const response = await fetch(`https://baseavanzadag1.onrender.com/clientes/${user.cliente_id}`, {
-        method: 'PUT', 
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sessionStorage.getItem('token')}`,
@@ -74,7 +80,7 @@ export default function ProfileDetails() {
       }
 
       const data = await response.json();
-      setCliente(data); 
+      setCliente(data);
       setEditingField(null);
       setTempValue("");
     } catch (error) {
@@ -85,6 +91,62 @@ export default function ProfileDetails() {
     }
   };
 
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      const response = await fetch(
+        "https://baseavanzadag1.onrender.com/clientes/change-password/",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            current_password: currentPassword,
+            new_password: newPassword,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al cambiar la contraseña");
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const onSubmitChangePassword = async () => {
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentPass || !newPass || !repeatNewPass) {
+      setPasswordError("Por favor, completa todos los campos.");
+      return;
+    }
+
+    if (newPass !== repeatNewPass) {
+      setPasswordError("Las nuevas contraseñas no coinciden.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      await changePassword(currentPass, newPass);
+      setPasswordSuccess("Contraseña cambiada con éxito.");
+      setCurrentPass("");
+      setNewPass("");
+      setRepeatNewPass("");
+    } catch (error) {
+      setPasswordError(error.message || "Error al cambiar la contraseña.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -140,7 +202,7 @@ export default function ProfileDetails() {
         {/* Tabs */}
         <div className="mt-4 flex space-x-6 mb-7">
           <button
-            className={`pb-2 text-sm ${tab === "detalle"
+            className={`pb-2 text-sm cursor-pointer ${tab === "detalle"
               ? "border-b-2 border-blue-600 text-blue-600 font-medium"
               : "text-gray-600"
               }`}
@@ -149,7 +211,7 @@ export default function ProfileDetails() {
             Detalle
           </button>
           <button
-            className={`pb-2 text-sm ${tab === "contrasena"
+            className={`pb-2 text-sm cursor-pointer ${tab === "contrasena"
               ? "border-b-2 border-blue-600 text-blue-600 font-medium"
               : "text-gray-600"
               }`}
@@ -349,9 +411,12 @@ export default function ProfileDetails() {
               <input
                 type="password"
                 className="w-full border border-gray-300 rounded px-3 py-2"
+                value={currentPass}
+                onChange={(e) => setCurrentPass(e.target.value)}
+                disabled={passwordLoading}
               />
             </div>
-            <hr></hr>
+            <hr />
             <div>
               <label className="text-sm text-gray-700 block mb-1">
                 Nueva contraseña
@@ -359,6 +424,9 @@ export default function ProfileDetails() {
               <input
                 type="password"
                 className="w-full border border-gray-300 rounded px-3 py-2"
+                value={newPass}
+                onChange={(e) => setNewPass(e.target.value)}
+                disabled={passwordLoading}
               />
             </div>
             <div>
@@ -368,6 +436,9 @@ export default function ProfileDetails() {
               <input
                 type="password"
                 className="w-full border border-gray-300 rounded px-3 py-2"
+                value={repeatNewPass}
+                onChange={(e) => setRepeatNewPass(e.target.value)}
+                disabled={passwordLoading}
               />
             </div>
 
@@ -377,9 +448,21 @@ export default function ProfileDetails() {
               <p>✖ Sin caracteres especiales (tildes, Ññ*/#.=)</p>
             </div>
 
+            {passwordError && (
+              <p className="text-red-600 font-semibold">{passwordError}</p>
+            )}
+            {passwordSuccess && (
+              <p className="text-green-600 font-semibold">{passwordSuccess}</p>
+            )}
+
             <div className="text-right">
-              <button className="bg-yellow-400 text-blue-950 font-bold px-6 py-2 rounded shadow hover:bg-yellow-300">
-                Guardar
+              <button
+                className={`bg-yellow-400 text-blue-950 font-bold px-6 py-2 rounded shadow hover:bg-yellow-300 ${passwordLoading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                onClick={onSubmitChangePassword}
+                disabled={passwordLoading}
+              >
+                {passwordLoading ? "Guardando..." : "Guardar"}
               </button>
             </div>
           </div>

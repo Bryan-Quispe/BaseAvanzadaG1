@@ -3,8 +3,10 @@ import { Logout } from '../../hooks/Logout';
 import { useAuth } from '../../context/AuthContext';
 import {getAccount} from '../../hooks/MenuHooks'
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import { useNavigate } from "react-router-dom";
 
 function DropdownMenu() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [usuario,setUsuario]= useState([]);
   const menuRef = useRef(null);
@@ -64,7 +66,7 @@ function DropdownMenu() {
             className="absolute top-full mt-2 right-0 w-40 bg-white rounded-md shadow-md overflow-hidden z-50"
           >
             <li>
-              <button className="w-full text-left px-4 py-2 hover:bg-gray-100">
+              <button className="w-full text-left px-4 py-2 hover:bg-gray-100"  onClick={() => navigate('/perfil')}>
                 <i className="bi bi-person"></i> Mi Perfil
               </button>
             </li>

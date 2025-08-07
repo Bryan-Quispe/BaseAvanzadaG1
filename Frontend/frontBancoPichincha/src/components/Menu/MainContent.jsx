@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import CuentasContent from "../Cuentas/CuentasContent";
 import Dashboard from "../../pages/Dashboard";
+import ProfileDetails from "../../pages/ProfileDetails";
 
 function MainContent() {
   return (
@@ -8,6 +9,7 @@ function MainContent() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/cuentas" element={<CuentasContent />} />
+        <Route path="/perfil" element={<ProfileDetails />} />
       </Routes>
     </main>
   );

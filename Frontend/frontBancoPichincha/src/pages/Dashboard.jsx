@@ -176,7 +176,26 @@ function Dashboard() {
                 return (
                   <React.Fragment key={cuenta.cuenta_id}>
                     {/* Cuenta */}
-                    {/* ... Tu bloque actual de cuenta y tarjetas ... */}
+                    <div className="relative bg-white p-6 rounded-lg shadow border border-yellow-400">
+                      <div className="absolute top-4 right-4 flex items-center space-x-1 text-yellow-500 text-sm font-semibold">
+                        <i className="bi bi-star-fill text-xl"></i>
+                        <span>Cuenta favorita</span>
+                      </div>
+                      <div className="text-blue-900 text-lg font-bold mb-1">{cuenta.cuenta_nombre}</div>
+                      <div className="text-gray-600 mb-4">{formatearNumeroCuenta(cuenta.cuenta_id)}</div>
+                      <div className="mb-6">
+                        <p className="text-sm text-gray-600 mb-1">Saldo disponible</p>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-xl font-bold text-green-600">
+                            {showBalances[indexCuenta] ? cuenta.cuenta_saldo : ocultarSaldo(cuenta.cuenta_saldo)} USD
+                          </p>
+                          <button onClick={() => toggleBalance(indexCuenta)} className="transform transition-transform duration-200 hover:scale-110">
+                            <i className={`bi ${showBalances[indexCuenta] ? "bi-eye-slash" : "bi-eye"} cursor-pointer text-2xl`}></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="absolute bottom-4 right-4 text-gray-500 text-sm">Cuenta de Ahorro</div>
+                    </div>
 
                     {/* Tarjetas asociadas */}
                     {tarjetasCuenta.map((tarjeta, idx) => {
@@ -186,16 +205,44 @@ function Dashboard() {
                           key={tarjeta.tarjeta_id}
                           className="relative p-6 rounded-lg shadow border border-purple-400"
                           style={{
-                            backgroundImage: `linear-gradient(rgba(255,255,255,0), rgba(255,255,255,0)), url('${
-                              tarjeta.tarjeta_estilo == 'VISA'
+                            backgroundImage: `linear-gradient(rgba(255,255,255,0), rgba(255,255,255,0)), url('${tarjeta.tarjeta_estilo == 'VISA'
                                 ? '/fondoGris.svg'
                                 : '/fondoDorado.svg'
-                            }')`,
+                              }')`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                           }}
                         >
                           {/* ... contenido de la tarjeta ... */}
+                           <div className="absolute top-4 right-4 flex items-center space-x-1 text-purple-500 text-sm font-semibold">
+                            <i className="bi bi-credit-card-2-front text-xl"></i>
+                            <span>Tarjeta {tarjeta.tipo}</span>
+                          </div>
+                          <div className="text-blue-900 text-lg font-bold mb-1">{tarjeta.tarjeta_nombre}</div>
+                          <div className="text-gray-600 mb-4">{formatearNumeroTarjeta(tarjeta.tarjeta_id)}</div>
+                          <div className="mb-6">
+                            {tarjeta.tipo === "Crédito" ? (
+                              <>
+                                <p className="text-sm text-gray-600 mb-1">Cupo Disponible</p>
+                                <div className="flex items-center space-x-2">
+                                  <p className="text-xl font-bold text-green-600">
+                                    {showBalances[indexGlobal] ? tarjeta.disponible : ocultarSaldo(tarjeta.disponible)} USD
+                                  </p>
+                                  <button
+                                    onClick={() => toggleBalance(indexGlobal)}
+                                    className="transform transition-transform duration-200 hover:scale-110"
+                                  >
+                                    <i
+                                      className={`bi ${showBalances[indexGlobal] ? "bi-eye-slash" : "bi-eye"} cursor-pointer text-2xl`}
+                                    ></i>
+                                  </button>
+                                </div>
+                              </>
+                            ) : null}
+                          </div>
+                          <div className="absolute bottom-4 font-bold right-4 text-gray-700 text-[30px]">
+                            {tarjeta.tarjeta_estilo}
+                          </div>
                         </div>
                       );
                     })}

@@ -15,6 +15,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import CreateAccount from './pages/AccountCreate.jsx';
 import AccountDetails from './pages/AccountDetails.jsx';
 import 'leaflet/dist/leaflet.css';
+import ProfileDetails from './pages/ProfileDetails.jsx';
 
 function App() {
   const { token } = useAuth();
@@ -37,6 +38,10 @@ function App() {
       <Route
         path="/accountDetails"
         element={isAuthenticated ? <AccountDetails /> : <Login />}
+      />
+      <Route
+        path="/profileDetails"
+        element={isAuthenticated ? <ProfileDetails />: <Login />}
       />
       <Route
         path="/registerSuccesfull"

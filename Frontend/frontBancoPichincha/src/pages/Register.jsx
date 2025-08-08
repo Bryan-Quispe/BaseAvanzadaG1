@@ -17,6 +17,7 @@ function Register() {
     cliente_provincia: "",
     cliente_ciudad: "",
     cliente_fchnacimiento: "",
+    cliente_contrasena: "",
   });
 
   useEffect(() => {
@@ -68,6 +69,7 @@ function Register() {
         cliente_provincia: "",
         cliente_ciudad: "",
         cliente_fchnacimiento: "",
+        cliente_contrasena:"",
       });
 
       sessionStorage.setItem("registerSuccesfull", true);
@@ -200,6 +202,15 @@ function Register() {
             name="cliente_fchnacimiento"
             type="date"
             value={formData.cliente_fchnacimiento}
+            onChange={handleChange}
+            required
+          />
+
+          <InputText
+            label="Contraseña"
+            name="cliente_contrasena"
+            type="password"
+            value={formData.cliente_contrasena}
             onChange={handleChange}
             required
           />

@@ -41,7 +41,7 @@ app = FastAPI(title="Banco Pichincha API")
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://your-frontend-domain.com"],
+    allow_origins=["http://localhost:5173", "https://base-avanzada-g1.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

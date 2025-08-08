@@ -11,7 +11,7 @@ function CreateAccount() {
         cliente_id: "",
         cuenta_nombre: "",
         cuenta_saldo: "",
-        cuenta_apertura: new Date().toISOString(),
+        cuenta_apertura: new Date().toISOString().split('T')[0],
         cuenta_estado: "ACTIVA",
         cuenta_limite_trans_web: "",
         cuenta_limite_trans_movil: "",

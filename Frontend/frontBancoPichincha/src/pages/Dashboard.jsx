@@ -226,7 +226,7 @@ function Dashboard() {
                                 <p className="text-sm text-gray-600 mb-1">Cupo Disponible</p>
                                 <div className="flex items-center space-x-2">
                                   <p className="text-xl font-bold text-green-600">
-                                    {showBalances[indexGlobal] ? tarjeta.disponible : ocultarSaldo(tarjeta.disponible)} USD
+                                    {showBalances[indexGlobal] ? tarjeta.tarjetacredito_cupo : ocultarSaldo(tarjeta.tarjetacredito_cupo)} USD
                                   </p>
                                   <button
                                     onClick={() => toggleBalance(indexGlobal)}

@@ -1,8 +1,9 @@
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import 'leaflet-routing-machine';
 
-// Arregla iconos (Leaflet no carga bien los íconos por defecto en React)
+// Arreglar íconos
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -11,46 +12,14 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const ESPE = { lat: -0.3275504, lng: -78.4429118 };
+const ESPE = { lat: -0.33405, lng: -78.45217 };
 
 const cajeros = [
-  { nombre: 'San luis', lat: -0.30828, lng: -78.45077 },
+  { nombre: 'San Luis', lat: -0.30828, lng: -78.45077 },
   { nombre: 'Av Luis Cordero', lat: -0.32733, lng: -78.44646 },
-  { nombre: 'Av General Enriques', lat: -0.32771, lng: -78.45037 },
-  {
-    nombre: 'Av Gral Rumiñahui Kywi San Rafael',
-    lat: -0.30212,
-    lng: -78.45626,
-  },
-  { nombre: 'Av. Río Curaray e Ilaló', lat: -0.29504, lng: -78.45199 },
-  { nombre: 'Centro comercial Alondras', lat: -0.29012, lng: -78.44556 },
-  { nombre: 'El triángulo - Pharmacys', lat: -0.30031, lng: -78.4604 },
-  { nombre: 'Plaza del Valle', lat: -0.30016, lng: -78.45978 },
-  { nombre: 'Av Gral Rumiñahui Isla Pinta', lat: -0.30623, lng: -78.44963 },
-  { nombre: 'Av Luis Cordero', lat: -0.32728, lng: -78.44639 },
-  { nombre: 'River Mall', lat: -0.32415, lng: -78.44891 },
-  { nombre: 'Puente 9 - Papeleria', lat: -0.29095, lng: -78.46586 },
+  { nombre: 'Av General Enríquez', lat: -0.32771, lng: -78.45037 },
+  // ...otros cajeros
 ];
-
-// Función para calcular distancia entre dos puntos geográficos en metros (Haversine)
-function calcularDistancia(lat1, lon1, lat2, lon2) {
-  const R = 6371e3; // Radio de la Tierra en metros
-  const toRad = (x) => (x * Math.PI) / 180;
-
-  const φ1 = toRad(lat1);
-  const φ2 = toRad(lat2);
-  const Δφ = toRad(lat2 - lat1);
-  const Δλ = toRad(lon2 - lon1);
-
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  const distancia = R * c; // en metros
-  return distancia;
-}
 
 const MapaCajeros = () => {
   const [cajeroMasCercano, setCajeroMasCercano] = useState(null);
@@ -58,19 +27,26 @@ const MapaCajeros = () => {
   useEffect(() => {
     let minDistancia = Infinity;
     let cercano = null;
-    for (const cajero of cajeros) {
-      const distancia = calcularDistancia(
-        ESPE.lat,
-        ESPE.lng,
-        cajero.lat,
-        cajero.lng
-      );
-      if (distancia < minDistancia) {
-        minDistancia = distancia;
-        cercano = cajero;
-      }
-    }
-    setCajeroMasCercano(cercano);
+
+    cajeros.forEach((cajero) => {
+      const url = `https://router.project-osrm.org/route/v1/driving/${ESPE.lng},${ESPE.lat};${cajero.lng},${cajero.lat}?overview=false`;
+
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => {
+          const distancia = data.routes?.[0]?.distance || Infinity;
+          console.log(`${cajero.nombre}: ${distancia.toFixed(2)} m`);
+
+          if (distancia < minDistancia) {
+            minDistancia = distancia;
+            cercano = cajero;
+            setCajeroMasCercano(cajero);
+          }
+        })
+        .catch((err) => {
+          console.error(`Error con ${cajero.nombre}:`, err);
+        });
+    });
   }, []);
 
   return (
@@ -88,19 +64,16 @@ const MapaCajeros = () => {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Marcador de la ESPE */}
         <Marker position={[ESPE.lat, ESPE.lng]}>
-          <Popup>ESPE Sangolquí (Referencia)</Popup>
+          <Popup>ESPE Sangolquí</Popup>
         </Marker>
 
-        {/* Marcadores cajeros */}
         {cajeros.map((cajero, idx) => (
           <Marker
             key={idx}
             position={[cajero.lat, cajero.lng]}
-            // Cambiamos color del icono para el cajero más cercano
             icon={
-              cajeroMasCercano && cajero.nombre === cajeroMasCercano.nombre
+              cajeroMasCercano?.nombre === cajero.nombre
                 ? new L.Icon({
                     iconUrl:
                       'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
@@ -116,12 +89,9 @@ const MapaCajeros = () => {
           >
             <Popup>
               {cajero.nombre}
-              {cajeroMasCercano &&
-                cajero.nombre === cajeroMasCercano.nombre && (
-                  <div>
-                    <strong> (Más cercano a ESPE) </strong>
-                  </div>
-                )}
+              {cajeroMasCercano?.nombre === cajero.nombre && (
+                <strong> (Más cercano)</strong>
+              )}
             </Popup>
           </Marker>
         ))}
